@@ -3,10 +3,12 @@ from config import Config
 from extensions import db
 from auth.routes import auth_bp
 from dashboard.routes import dashboard_bp
+from flask_migrate import Migrate
+
 
 app = Flask(__name__)
 app.config.from_object(Config)
-
+migrate = Migrate(app, db)
 db.init_app(app)
 
 # Register blueprints
