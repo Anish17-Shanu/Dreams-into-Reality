@@ -1,12 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Add New Goal</h2>
+<h2>Add Subject</h2>
 <form method="POST">
-    <label>Goal Name:</label>
-    <input type="text" name="name" required>
-    <label>Total Topics:</label>
-    <input type="number" name="total" required min="1">
-    <button type="submit">Add Subject</button>
+    <input type="text" name="name" placeholder="Subject Name" required><br>
+    <input type="number" name="total_topics" placeholder="Total Topics" required><br>
+    <input type="date" name="deadline"><br>
+    <button type="submit">Add</button>
 </form>
-<a href="{{ url_for('dashboard') }}">⬅ Back to Dashboard</a>
+<a href="{{ url_for('dashboard.dashboard') }}">Back</a>
 {% endblock %}

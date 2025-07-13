@@ -1,98 +1,63 @@
-
 {% extends 'base.html' %}
 {% block content %}
-<h2>Dashboard</h2>
-
-<!-- Overall Progress -->
+<h2>Welcome, {{ user.email }}</h2>
 <p><strong>Overall Progress:</strong> {{ overall_progress }}%</p>
 <progress value="{{ overall_progress }}" max="100" style="width: 100%; height: 25px;"></progress>
-<canvas id="overallChart" width="400" height="200" style="margin-bottom: 20px;"></canvas>
 
-<!-- Add Subject Button -->
-<a href="{{ url_for('add_subject') }}">+ Add Subject</a>
+<a href="{{ url_for('dashboard.add_subject') }}">+ Add Subject</a>
 
-<!-- Subject List -->
 <ul>
     {% for subject in subjects %}
-        <li style="margin-bottom: 30px;">
-            <b>{{ subject.name }}</b><br>
-            {{ subject.completed_topics }} / {{ subject.total_topics }} completed
-            <progress value="{{ subject.completed_topics }}" max="{{ subject.total_topics }}" style="width: 100%;"></progress>
+    <li>
+        <b>{{ subject.name }}</b><br>
+        {{ subject.completed_topics }} / {{ subject.total_topics }} completed
+        <progress value="{{ subject.completed_topics }}" max="{{ subject.total_topics }}"></progress><br>
+        Deadline: {{ subject.deadline or 'None' }}<br>
+        Updated: {{ subject.updated_at.strftime('%Y-%m-%d %H:%M') }}<br>
 
-            <!-- Update Progress Form -->
-            <form method="POST" action="{{ url_for('update_progress', subject_id=subject.id) }}" style="margin-top: 5px;">
-                <input type="number" name="completed" value="{{ subject.completed_topics }}" min="0" max="{{ subject.total_topics }}">
-                <button type="submit">Update</button>
-            </form>
+        <form action="{{ url_for('dashboard.update_progress', subject_id=subject.id) }}" method="POST">
+            <input type="number" name="completed" value="{{ subject.completed_topics }}" min="0" max="{{ subject.total_topics }}">
+            <button type="submit">Update</button>
+        </form>
 
-            <!-- Delete Subject Form -->
-            <form method="POST" action="{{ url_for('delete_subject', subject_id=subject.id) }}" style="margin-top: 5px;">
-                <button type="submit" style="background-color: red; color: white;">Delete</button>
-            </form>
+        <a href="{{ url_for('dashboard.edit_subject', subject_id=subject.id) }}">Edit</a>
 
-            <!-- Individual Subject Chart -->
-            <canvas id="subjectChart{{ subject.id }}" width="400" height="100" style="margin-top: 10px;"></canvas>
-        </li>
+        <form method="POST" action="{{ url_for('dashboard.delete_subject', subject_id=subject.id) }}">
+            <button type="submit" style="color: red;">Delete</button>
+        </form>
+    </li>
+    <!-- Chart + Estimate -->
+    <div style="margin: 15px 0;">
+        <canvas id="subjectChart{{ subject.id }}"></canvas>
+        <p>
+            📅 Estimated Finish: {{ analytics_data[loop.index0].est_finish_date }}<br>
+            {% if analytics_data[loop.index0].overdue %}
+            ⚠️ <strong style="color: red;">Behind Deadline!</strong>
+            {% endif %}
+        </p>
+    </div>
+
     {% endfor %}
 </ul>
 
-<!-- Logout -->
-<a href="{{ url_for('logout') }}">Logout</a>
-
-<!-- Chart.js CDN -->
+<a href="{{ url_for('auth.logout') }}">Logout</a>
+{% endblock %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- Chart Rendering -->
 <script>
-    // Overall Progress Chart
-    const overallProgress = {{ overall_progress | tojson }};
-    const overallChart = new Chart(document.getElementById('overallChart').getContext('2d'), {
-        type: 'doughnut',
+    {% for data in analytics_data %}
+    new Chart(document.getElementById("subjectChart{{ data.id }}").getContext("2d"), {
+        type: "bar",
         data: {
-            labels: ['Completed', 'Remaining'],
+            labels: ["Completed", "Remaining"],
             datasets: [{
-                label: 'Overall Progress',
-                data: [overallProgress, 100 - overallProgress],
+                label: "{{ data.name }}",
+                data: [{{ data.completed }}, {{ data.remaining }}],
                 backgroundColor: ['#4ade80', '#f87171']
             }]
         },
         options: {
-            cutout: '70%',
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }
-    });
-
-    // Subject Charts
-    {% for subject in subjects %}
-    new Chart(document.getElementById('subjectChart{{ subject.id }}').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: ['Completed', 'Remaining'],
-            datasets: [{
-                label: {{ subject.name | tojson }},
-                data: [{{ subject.completed_topics }}, {{ subject.total_topics - subject.completed_topics }}],
-                backgroundColor: ['#60a5fa', '#facc15']
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    suggestedMax: {{ subject.total_topics }}
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false
-                }
-            }
+            scales: { y: { beginAtZero: true } }
         }
     });
     {% endfor %}
 </script>
-{% endblock %}
