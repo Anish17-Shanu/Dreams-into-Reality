@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Dashboard</h2>
+
+<!-- Overall Progress -->
+<p><strong>Overall Progress:</strong> {{ overall_progress }}%</p>
+<progress value="{{ overall_progress }}" max="100" style="width: 100%; height: 25px;"></progress>
+<canvas id="overallChart" width="400" height="200" style="margin-bottom: 20px;"></canvas>
+
+<!-- Add Subject Button -->
+<a href="{{ url_for('add_subject') }}">+ Add Subject</a>
+
+<!-- Subject List -->
+<ul>
+    {% for subject in subjects %}
+        <li style="margin-bottom: 30px;">
+            <b>{{ subject.name }}</b><br>
+            {{ subject.completed_topics }} / {{ subject.total_topics }} completed
+            <progress value="{{ subject.completed_topics }}" max="{{ subject.total_topics }}" style="width: 100%;"></progress>
+
+            <!-- Update Progress Form -->
+            <form method="POST" action="{{ url_for('update_progress', subject_id=subject.id) }}" style="margin-top: 5px;">
+                <input type="number" name="completed" value="{{ subject.completed_topics }}" min="0" max="{{ subject.total_topics }}">
+                <button type="submit">Update</button>
+            </form>
+
+            <!-- Delete Subject Form -->
+            <form method="POST" action="{{ url_for('delete_subject', subject_id=subject.id) }}" style="margin-top: 5px;">
+                <button type="submit" style="background-color: red; color: white;">Delete</button>
+            </form>
+
+            <!-- Individual Subject Chart -->
+            <canvas id="subjectChart{{ subject.id }}" width="400" height="100" style="margin-top: 10px;"></canvas>
+        </li>
+    {% endfor %}
+</ul>
+
+<!-- Logout -->
+<a href="{{ url_for('logout') }}">Logout</a>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Chart Rendering -->
+<script>
+    // Overall Progress Chart
+    const overallProgress = {{ overall_progress | tojson }};
+    const overallChart = new Chart(document.getElementById('overallChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Completed', 'Remaining'],
+            datasets: [{
+                label: 'Overall Progress',
+                data: [overallProgress, 100 - overallProgress],
+                backgroundColor: ['#4ade80', '#f87171']
+            }]
+        },
+        options: {
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Subject Charts
+    {% for subject in subjects %}
+    new Chart(document.getElementById('subjectChart{{ subject.id }}').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: ['Completed', 'Remaining'],
+            datasets: [{
+                label: {{ subject.name | tojson }},
+                data: [{{ subject.completed_topics }}, {{ subject.total_topics - subject.completed_topics }}],
+                backgroundColor: ['#60a5fa', '#facc15']
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: {{ subject.total_topics }}
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    {% endfor %}
+</script>
+{% endblock %}
