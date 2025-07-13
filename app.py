@@ -50,8 +50,24 @@ def login():
 def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    subjects = Subject.query.filter_by(user_id=session['user_id']).all()
-    return render_template('dashboard.html', subjects=subjects)
+
+    user = User.query.get(session['user_id'])
+    subjects = Subject.query.filter_by(user_id=user.id).all()
+
+    total_topics = sum(subject.total_topics for subject in subjects)
+    completed_topics = sum(subject.completed_topics for subject in subjects)
+
+    overall_progress = 0
+    if total_topics > 0:
+        overall_progress = round((completed_topics / total_topics) * 100, 2)
+
+    # ✅ Pass `overall_progress` into the template:
+    return render_template(
+        'dashboard.html',
+        subjects=subjects,
+        overall_progress=overall_progress
+    )
+
 
 @app.route('/add_subject', methods=['GET', 'POST'])
 def add_subject():
@@ -87,5 +103,8 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-if __name__ == '__main__':
-    app.run(debug=True)
+import os
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))  # Render sets $PORT
+    app.run(host="0.0.0.0", port=port, debug=True)
