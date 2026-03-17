@@ -86,16 +86,72 @@ def _normalize(text):
 def _extract_topics_from_text(text):
     if not text:
         return []
-    lines = [l.strip(" -\t") for l in text.splitlines()]
-    lines = [l for l in lines if len(l) > 2]
-    if len(lines) <= 2:
-        parts = re.split(r"[.;]\s+", text)
-        lines = [p.strip() for p in parts if len(p.strip()) > 2]
+    return _extract_topics_rulebased(text)
+
+
+def _extract_topics_rulebased(text):
+    if not text:
+        return []
+    candidates = []
+    lines = [l.strip() for l in text.splitlines()]
+    lines = [l for l in lines if l]
+
+    heading_patterns = [
+        r"^(unit|module|chapter|week|topic)\s*\d+[:\.-]?\s*(.*)$",
+        r"^\d+[\.\)]\s*(.*)$",
+        r"^[A-Za-z]\)\s*(.*)$",
+        r"^[-•\*]\s*(.*)$",
+    ]
+
+    for line in lines:
+        cleaned = line.strip(" \t-•*")
+        matched = False
+        for pat in heading_patterns:
+            m = re.match(pat, cleaned, re.IGNORECASE)
+            if m:
+                topic = m.group(2) if m.lastindex and m.lastindex >= 2 else m.group(1)
+                if topic:
+                    candidates.append(topic.strip())
+                matched = True
+                break
+        if matched:
+            continue
+
+        if ":" in cleaned and len(cleaned.split(":")[0].split()) <= 3:
+            parts = cleaned.split(":", 1)
+            if len(parts) == 2:
+                left = parts[0].strip()
+                right = parts[1].strip()
+                if right:
+                    candidates.append(right)
+                elif left:
+                    candidates.append(left)
+            continue
+
+        if len(cleaned.split()) <= 8 and any(ch.isalpha() for ch in cleaned):
+            candidates.append(cleaned)
+
+    expanded = []
+    for item in candidates:
+        if "," in item and len(item) < 120:
+            parts = [p.strip() for p in item.split(",") if p.strip()]
+            if len(parts) > 1:
+                expanded.extend(parts)
+            else:
+                expanded.append(item)
+        else:
+            expanded.append(item)
+
     unique = []
-    for item in lines:
-        if item.lower() not in [u.lower() for u in unique]:
-            unique.append(item)
-    return unique[:60]
+    seen = set()
+    for item in expanded:
+        normalized = re.sub(r"\s+", " ", item).strip()
+        if 2 <= len(normalized) <= 80:
+            key = normalized.lower()
+            if key not in seen:
+                seen.add(key)
+                unique.append(normalized)
+    return unique[:80]
 
 
 def _extract_text_from_pdf(file_path):

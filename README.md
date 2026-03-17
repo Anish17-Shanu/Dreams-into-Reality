@@ -80,6 +80,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **Refresh cooldown**: Resources refresh every `RESOURCE_REFRESH_DAYS` to avoid rate limits.
 - **AI extraction**: Turn on `AI_TOPIC_EXTRACTION_ENABLED` or check the UI box to use OpenAI's Responses API for messy syllabi.
 - **Free AI alternative**: Provide `HF_API_KEY` to use Hugging Face Inference for topic extraction if OpenAI isn't configured.
+- **No-API fallback**: A stronger rule-based parser handles bullets, units, and numbered sections when no AI is configured.
 
 ## Roadmap Creation
 - **Syllabus**: Paste topics or upload a PDF/TXT. Topics become tasks.
