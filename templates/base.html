@@ -27,6 +27,7 @@
             {% if session.get('user_id') %}
                 <a href="{{ url_for('dashboard.dashboard') }}">Dreamboard</a>
                 <a href="{{ url_for('dashboard.create_roadmap') }}">New Mission</a>
+                <button type="button" class="ghost calm-toggle" aria-pressed="false">Calm Mode</button>
                 <a href="{{ url_for('auth.logout') }}" class="nav-cta">Logout</a>
             {% else %}
                 <a href="{{ url_for('auth.login') }}">Login</a>
@@ -51,6 +52,23 @@
         if (params.get("celebrate") === "1") {
             document.body.classList.add("celebrate");
             setTimeout(() => document.body.classList.remove("celebrate"), 2200);
+        }
+        const calmToggle = document.querySelector(".calm-toggle");
+        const applyCalm = (enabled) => {
+            document.body.classList.toggle("calm", enabled);
+            if (calmToggle) {
+                calmToggle.setAttribute("aria-pressed", enabled ? "true" : "false");
+                calmToggle.textContent = enabled ? "Calm Mode: On" : "Calm Mode";
+            }
+        };
+        if (calmToggle) {
+            const stored = localStorage.getItem("dir_calm_mode");
+            applyCalm(stored === "true");
+            calmToggle.addEventListener("click", () => {
+                const next = !document.body.classList.contains("calm");
+                localStorage.setItem("dir_calm_mode", next ? "true" : "false");
+                applyCalm(next);
+            });
         }
     </script>
 </body>

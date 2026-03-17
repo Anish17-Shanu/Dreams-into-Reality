@@ -53,6 +53,11 @@
             <input type="text" name="note" placeholder="Reflection note (optional)">
             <button type="submit">Log a Win</button>
         </form>
+        <form method="POST" action="{{ url_for('dashboard.checkin', roadmap_id=roadmap.id) }}" class="quick-checkin">
+            <input type="hidden" name="minutes" value="15">
+            <input type="hidden" name="note" value="Quick check-in">
+            <button type="submit">Quick 15‑min Win</button>
+        </form>
         <div class="action-links">
             <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>
             <a class="ghost" href="{{ url_for('dashboard.export_ics', roadmap_id=roadmap.id) }}">Export Calendar</a>
