@@ -21,3 +21,15 @@ services:
         value: "gpt-5"
       - key: AI_TOPIC_EXTRACTION_ENABLED
         value: "false"
+      - key: HF_API_KEY
+        sync: false
+      - key: HF_MODEL
+        value: "google/flan-t5-large"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: "evidence"
+      - key: SIGNED_URL_EXPIRES_SECONDS
+        value: "600"

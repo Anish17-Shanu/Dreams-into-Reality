@@ -10,3 +10,5 @@ gunicorn
 python-docx
 Pillow
 pytesseract
+supabase
+huggingface_hub

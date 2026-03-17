@@ -38,6 +38,12 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
    OPENAI_API_KEY=your_openai_key
    OPENAI_MODEL=gpt-5
    AI_TOPIC_EXTRACTION_ENABLED=false
+   HF_API_KEY=your_hf_key
+   HF_MODEL=google/flan-t5-large
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=service_role_key
+   SUPABASE_STORAGE_BUCKET=evidence
+   SIGNED_URL_EXPIRES_SECONDS=600
    ```
 3. Run the app:
    ```bash
@@ -73,6 +79,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **Optional OCR**: Image-based syllabus upload uses `pytesseract`. Install the Tesseract binary if you want OCR enabled.
 - **Refresh cooldown**: Resources refresh every `RESOURCE_REFRESH_DAYS` to avoid rate limits.
 - **AI extraction**: Turn on `AI_TOPIC_EXTRACTION_ENABLED` or check the UI box to use OpenAI's Responses API for messy syllabi.
+- **Free AI alternative**: Provide `HF_API_KEY` to use Hugging Face Inference for topic extraction if OpenAI isn't configured.
 
 ## Roadmap Creation
 - **Syllabus**: Paste topics or upload a PDF/TXT. Topics become tasks.
@@ -94,6 +101,8 @@ Dreams-into-Reality/
 - Supabase database created
 - `DATABASE_URL` set in Render
 - `SECRET_KEY` set in Render
+- Supabase Storage bucket created (default: `evidence`)
+- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set in Render
 - Run migrations when updating models:
   ```bash
   flask db init

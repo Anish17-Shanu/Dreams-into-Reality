@@ -10,6 +10,8 @@ import csv
 import io
 import math
 import requests
+from supabase import create_client
+from huggingface_hub import InferenceClient
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -152,6 +154,14 @@ def _safe_get(url, headers=None, params=None):
     return None
 
 
+def _supabase_client():
+    url = current_app.config.get("SUPABASE_URL")
+    key = current_app.config.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        return None
+    return create_client(url, key)
+
+
 def _ai_extract_topics(text):
     api_key = current_app.config.get("OPENAI_API_KEY")
     model = current_app.config.get("OPENAI_MODEL")
@@ -198,6 +208,28 @@ def _ai_extract_topics(text):
                 return [str(x).strip() for x in parsed if str(x).strip()]
         except Exception:
             return _extract_topics_from_text(raw)
+    except Exception:
+        return []
+    return []
+
+
+def _hf_extract_topics(text):
+    api_key = current_app.config.get("HF_API_KEY")
+    model = current_app.config.get("HF_MODEL")
+    if not api_key or not model:
+        return []
+    prompt = (
+        "Extract a JSON array of unique topic strings from the syllabus text. "
+        "Keep each topic short. Return only JSON.\n\n"
+        f"Syllabus:\n{text[:8000]}"
+    )
+    try:
+        client = InferenceClient(model=model, token=api_key)
+        response = client.text_generation(prompt, max_new_tokens=400, temperature=0.1)
+        import json
+        parsed = json.loads(response)
+        if isinstance(parsed, list):
+            return [str(x).strip() for x in parsed if str(x).strip()]
     except Exception:
         return []
     return []
@@ -426,6 +458,8 @@ def create_roadmap():
 
         if (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text:
             ai_topics = _ai_extract_topics(raw_text)
+            if not ai_topics:
+                ai_topics = _hf_extract_topics(raw_text)
             if ai_topics:
                 topics = ai_topics
 
@@ -544,9 +578,24 @@ def update_task_status(roadmap_id, task_id):
             return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
         filename = secure_filename(evidence.filename)
         unique_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
-        file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_name)
-        evidence.save(file_path)
-        task.evidence_path = unique_name
+        storage_client = _supabase_client()
+        if storage_client:
+            bucket = current_app.config.get("SUPABASE_STORAGE_BUCKET", "evidence")
+            storage_path = f"{session['user_id']}/{roadmap.id}/{task.id}/{unique_name}"
+            try:
+                storage_client.storage.from_(bucket).upload(
+                    storage_path,
+                    evidence.stream.read(),
+                    {"content-type": evidence.mimetype or "application/octet-stream"}
+                )
+                task.evidence_path = storage_path
+            except Exception:
+                flash("Failed to upload evidence to storage.")
+                return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+        else:
+            file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_name)
+            evidence.save(file_path)
+            task.evidence_path = unique_name
 
     if new_status == "done":
         task.completed_at = datetime.utcnow()
@@ -721,9 +770,20 @@ def delete_roadmap(roadmap_id):
     return redirect(url_for('dashboard.dashboard'))
 
 
-@dashboard_bp.route('/uploads/<filename>')
+@dashboard_bp.route('/uploads/<path:filename>')
 @login_required
 def get_upload(filename):
+    storage_client = _supabase_client()
+    if storage_client and "/" in filename:
+        bucket = current_app.config.get("SUPABASE_STORAGE_BUCKET", "evidence")
+        expires = current_app.config.get("SIGNED_URL_EXPIRES_SECONDS", 600)
+        try:
+            signed = storage_client.storage.from_(bucket).create_signed_url(filename, expires)
+            signed_url = signed.get("signedURL") or signed.get("signed_url")
+            if signed_url:
+                return redirect(signed_url)
+        except Exception:
+            pass
     safe_name = secure_filename(filename)
     file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], safe_name)
     if not os.path.isfile(file_path):

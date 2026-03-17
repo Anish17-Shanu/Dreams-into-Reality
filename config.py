@@ -20,3 +20,9 @@ class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
     AI_TOPIC_EXTRACTION_ENABLED = os.getenv("AI_TOPIC_EXTRACTION_ENABLED", "false").lower() == "true"
+    HF_API_KEY = os.getenv("HF_API_KEY", "")
+    HF_MODEL = os.getenv("HF_MODEL", "google/flan-t5-large")
+    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+    SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "evidence")
+    SIGNED_URL_EXPIRES_SECONDS = int(os.getenv("SIGNED_URL_EXPIRES_SECONDS", "600"))
