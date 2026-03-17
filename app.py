@@ -18,7 +18,8 @@ app.register_blueprint(dashboard_bp)
 
 with app.app_context():
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-    db.create_all()
+    if os.getenv("AUTO_CREATE_SCHEMA", "false").lower() == "true":
+        db.create_all()
 
 if __name__ == "__main__":
     import os
