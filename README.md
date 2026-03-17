@@ -44,6 +44,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
    SUPABASE_SERVICE_ROLE_KEY=service_role_key
    SUPABASE_STORAGE_BUCKET=evidence
    SIGNED_URL_EXPIRES_SECONDS=600
+   AUTO_FETCH_RESOURCES_ON_CREATE=false
    ```
 3. Run the app:
    ```bash
@@ -82,6 +83,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **AI extraction**: Turn on `AI_TOPIC_EXTRACTION_ENABLED` or check the UI box to use OpenAI's Responses API for messy syllabi.
 - **Free AI alternative**: Provide `HF_API_KEY` to use Hugging Face Inference for topic extraction if OpenAI isn't configured.
 - **No-API fallback**: A stronger rule-based parser handles bullets, units, and numbered sections when no AI is configured.
+- **Render tip**: Keep `AUTO_FETCH_RESOURCES_ON_CREATE=false` to avoid timeouts during creation. Refresh resources per task later.
 
 ## Roadmap Creation
 - **Syllabus**: Paste topics or upload a PDF/TXT. Topics become tasks.

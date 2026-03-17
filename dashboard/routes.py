@@ -547,6 +547,7 @@ def create_roadmap():
         db.session.add(roadmap)
         db.session.flush()
 
+        auto_fetch = current_app.config.get("AUTO_FETCH_RESOURCES_ON_CREATE", False)
         for spec in task_specs:
             task = Task(
                 title=spec["title"],
@@ -559,17 +560,18 @@ def create_roadmap():
             db.session.add(task)
             db.session.flush()
 
-            resources = _fetch_resources_for_topic(spec["title"].replace("Project: ", ""))
-            for res in resources:
-                db.session.add(Resource(
-                    provider=res["provider"],
-                    title=res["title"],
-                    url=res["url"],
-                    summary=res.get("summary", ""),
-                    score=res.get("score", 0.0),
-                    task_id=task.id
-                ))
-            task.last_resource_refresh = datetime.utcnow()
+            if auto_fetch:
+                resources = _fetch_resources_for_topic(spec["title"].replace("Project: ", ""))
+                for res in resources:
+                    db.session.add(Resource(
+                        provider=res["provider"],
+                        title=res["title"],
+                        url=res["url"],
+                        summary=res.get("summary", ""),
+                        score=res.get("score", 0.0),
+                        task_id=task.id
+                    ))
+                task.last_resource_refresh = datetime.utcnow()
 
         db.session.commit()
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
