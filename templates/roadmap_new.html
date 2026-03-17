@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div>
+        <h1>Create a roadmap</h1>
+        <p class="muted">Upload a syllabus or define a career goal. We'll build a timeline with tasks and resources.</p>
+    </div>
+    <form method="POST" enctype="multipart/form-data" class="stack">
+        <label>
+            Roadmap title
+            <input type="text" name="title" placeholder="e.g. Data Analyst Roadmap" required>
+        </label>
+        <label>
+            Roadmap type
+            <select name="roadmap_type">
+                <option value="syllabus">Syllabus</option>
+                <option value="career">Career</option>
+            </select>
+        </label>
+        <label>
+            Timeline (weeks)
+            <input type="number" name="timeline_weeks" min="2" max="52" value="8">
+        </label>
+        <label>
+            Start date
+            <input type="date" name="start_date">
+        </label>
+        <label>
+            Paste your syllabus or outline
+            <textarea name="source_text" rows="6" placeholder="Paste topics here, one per line."></textarea>
+        </label>
+        <label>
+            Upload a syllabus file (PDF/TXT)
+            <input type="file" name="syllabus_file" accept=".pdf,.txt">
+        </label>
+        <div class="hint">
+            <strong>Career templates available:</strong>
+            <span>{{ templates | join(', ') }}</span>
+        </div>
+        <button type="submit">Generate roadmap</button>
+    </form>
+</section>
+{% endblock %}

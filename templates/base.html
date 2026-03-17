@@ -1,14 +1,37 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dreams into Reality</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark">DIR</span>
+            <span class="brand-text">Dreams into Reality</span>
+        </div>
+        <nav class="nav">
+            {% if session.get('user_id') %}
+                <a href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('dashboard.create_roadmap') }}">New Roadmap</a>
+                <a href="{{ url_for('auth.logout') }}" class="nav-cta">Logout</a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}">Login</a>
+                <a href="{{ url_for('auth.register') }}" class="nav-cta">Get Started</a>
+            {% endif %}
+        </nav>
+    </header>
+    <main class="container">
         {% with messages = get_flashed_messages() %}
           {% if messages %}
-            <ul>
+            <ul class="flash">
               {% for msg in messages %}
                 <li>{{ msg }}</li>
               {% endfor %}
@@ -16,6 +39,7 @@
           {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
-    </div>
+    </main>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

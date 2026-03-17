@@ -1,63 +1,43 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Welcome, {{ user.email }}</h2>
-<p><strong>Overall Progress:</strong> {{ overall_progress }}%</p>
-<progress value="{{ overall_progress }}" max="100" style="width: 100%; height: 25px;"></progress>
-
-<a href="{{ url_for('dashboard.add_subject') }}">+ Add Subject</a>
-
-<ul>
-    {% for subject in subjects %}
-    <li>
-        <b>{{ subject.name }}</b><br>
-        {{ subject.completed_topics }} / {{ subject.total_topics }} completed
-        <progress value="{{ subject.completed_topics }}" max="{{ subject.total_topics }}"></progress><br>
-        Deadline: {{ subject.deadline or 'None' }}<br>
-        Updated: {{ subject.updated_at.strftime('%Y-%m-%d %H:%M') }}<br>
-
-        <form action="{{ url_for('dashboard.update_progress', subject_id=subject.id) }}" method="POST">
-            <input type="number" name="completed" value="{{ subject.completed_topics }}" min="0" max="{{ subject.total_topics }}">
-            <button type="submit">Update</button>
-        </form>
-
-        <a href="{{ url_for('dashboard.edit_subject', subject_id=subject.id) }}">Edit</a>
-
-        <form method="POST" action="{{ url_for('dashboard.delete_subject', subject_id=subject.id) }}">
-            <button type="submit" style="color: red;">Delete</button>
-        </form>
-    </li>
-    <!-- Chart + Estimate -->
-    <div style="margin: 15px 0;">
-        <canvas id="subjectChart{{ subject.id }}"></canvas>
-        <p>
-            📅 Estimated Finish: {{ analytics_data[loop.index0].est_finish_date }}<br>
-            {% if analytics_data[loop.index0].overdue %}
-            ⚠️ <strong style="color: red;">Behind Deadline!</strong>
-            {% endif %}
-        </p>
+<section class="hero">
+    <div>
+        <h1>Welcome, {{ user.email }}</h1>
+        <p class="muted">Your next milestone is waiting. Build a roadmap and make consistent progress.</p>
     </div>
+    <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Create Roadmap</a>
+</section>
 
-    {% endfor %}
-</ul>
-
-<a href="{{ url_for('auth.logout') }}">Logout</a>
+<section class="grid">
+    {% if roadmaps %}
+        {% for roadmap in roadmaps %}
+            <article class="card">
+                <div class="card-header">
+                    <h3>{{ roadmap.title }}</h3>
+                    <span class="pill">{{ roadmap.roadmap_type|capitalize }}</span>
+                </div>
+                <p class="muted">Timeline: {{ roadmap.start_date }} to {{ roadmap.target_date }}</p>
+                <div class="progress-row">
+                    <div class="progress">
+                        {% set pct = (roadmap.completed_tasks / roadmap.total_tasks * 100) if roadmap.total_tasks else 0 %}
+                        <div class="progress-bar" style="width: {{ pct }}%"></div>
+                    </div>
+                    <span>{{ roadmap.completed_tasks }}/{{ roadmap.total_tasks }}</span>
+                </div>
+                <div class="card-actions">
+                    <a href="{{ url_for('dashboard.view_roadmap', roadmap_id=roadmap.id) }}">Open</a>
+                    <form method="POST" action="{{ url_for('dashboard.delete_roadmap', roadmap_id=roadmap.id) }}">
+                        <button class="ghost" type="submit">Delete</button>
+                    </form>
+                </div>
+            </article>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <h3>No roadmaps yet</h3>
+            <p class="muted">Upload a syllabus or describe a career goal to generate your first plan.</p>
+            <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Build a roadmap</a>
+        </div>
+    {% endif %}
+</section>
 {% endblock %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    {% for data in analytics_data %}
-    new Chart(document.getElementById("subjectChart{{ data.id }}").getContext("2d"), {
-        type: "bar",
-        data: {
-            labels: ["Completed", "Remaining"],
-            datasets: [{
-                label: "{{ data.name }}",
-                data: [{{ data.completed }}, {{ data.remaining }}],
-                backgroundColor: ['#4ade80', '#f87171']
-            }]
-        },
-        options: {
-            scales: { y: { beginAtZero: true } }
-        }
-    });
-    {% endfor %}
-</script>

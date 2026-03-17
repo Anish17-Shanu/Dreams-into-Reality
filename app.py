@@ -4,6 +4,7 @@ from extensions import db
 from auth.routes import auth_bp
 from dashboard.routes import dashboard_bp
 from flask_migrate import Migrate
+import os
 
 
 app = Flask(__name__)
@@ -16,6 +17,7 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
 
 with app.app_context():
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     db.create_all()
 
 if __name__ == "__main__":

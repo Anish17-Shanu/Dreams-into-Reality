@@ -1,12 +1,21 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Register</h2>
-<form method="POST">
-    <label>Email:</label>
-    <input type="email" name="email" required>
-    <label>Password:</label>
-    <input type="password" name="password" required>
-    <button type="submit">Register</button>
-</form>
-<p>Already have an account? <a href="{{ url_for('auth.login') }}">Login</a></p>
+<section class="auth-card">
+    <div>
+        <h1>Start your journey</h1>
+        <p class="muted">Build roadmaps for syllabi or careers and track every win.</p>
+    </div>
+    <form method="POST" class="stack">
+        <label>
+            Email
+            <input type="email" name="email" placeholder="you@example.com" required>
+        </label>
+        <label>
+            Password
+            <input type="password" name="password" placeholder="Create a strong password" required>
+        </label>
+        <button type="submit">Create account</button>
+    </form>
+    <p class="muted">Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a></p>
+</section>
 {% endblock %}

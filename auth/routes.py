@@ -8,7 +8,7 @@ auth_bp = Blueprint('auth', __name__)
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        email = request.form['email']
+        email = request.form['email'].strip().lower()
         password = generate_password_hash(request.form['password'])
 
         if User.query.filter_by(email=email).first():
@@ -26,7 +26,8 @@ def register():
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        user = User.query.filter_by(email=request.form['email']).first()
+        email = request.form['email'].strip().lower()
+        user = User.query.filter_by(email=email).first()
         if user and check_password_hash(user.password, request.form['password']):
             session['user_id'] = user.id
             return redirect(url_for('dashboard.dashboard'))

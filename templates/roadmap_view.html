@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <span class="pill">{{ roadmap.roadmap_type|capitalize }}</span>
+            <h1>{{ roadmap.title }}</h1>
+            <p class="muted">Timeline: {{ roadmap.start_date }} to {{ roadmap.target_date }}</p>
+        </div>
+        <div class="progress-inline">
+            <div class="progress">
+                <div class="progress-bar" style="width: {{ progress }}%"></div>
+            </div>
+            <span>{{ progress }}%</span>
+        </div>
+    </div>
+
+    <div class="task-list">
+        {% for task in tasks %}
+            <article class="task-card">
+                <div class="task-meta">
+                    <span class="task-index">#{{ task.order_index }}</span>
+                    <h3>{{ task.title }}</h3>
+                </div>
+                <p class="muted">Due: {{ task.due_date or 'Flexible' }}</p>
+                <form method="POST" action="{{ url_for('dashboard.update_task_status', roadmap_id=roadmap.id, task_id=task.id) }}" class="task-actions">
+                    <select name="status">
+                        <option value="todo" {% if task.status == 'todo' %}selected{% endif %}>To do</option>
+                        <option value="doing" {% if task.status == 'doing' %}selected{% endif %}>In progress</option>
+                        <option value="done" {% if task.status == 'done' %}selected{% endif %}>Done</option>
+                    </select>
+                    <button type="submit">Update</button>
+                </form>
+                {% if task.resources %}
+                    <div class="resource-list">
+                        {% for res in task.resources %}
+                            <a href="{{ res.url }}" target="_blank" rel="noopener">
+                                <span class="resource-pill">{{ res.provider|capitalize }}</span>
+                                <strong>{{ res.title }}</strong>
+                                <span class="muted">{{ res.summary }}</span>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="muted">No external resources fetched for this task yet.</p>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

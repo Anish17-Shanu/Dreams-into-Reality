@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero hero-wide">
+    <div>
+        <span class="pill">Dreams into Reality</span>
+        <h1>Turn any syllabus or career goal into a focused roadmap.</h1>
+        <p class="muted">Upload topics, set a timeline, and track real progress with curated resources from the web.</p>
+        <div class="hero-actions">
+            <a class="primary" href="{{ url_for('auth.register') }}">Get started</a>
+            <a class="ghost" href="{{ url_for('auth.login') }}">I already have an account</a>
+        </div>
+    </div>
+    <div class="hero-card">
+        <h3>What you can do</h3>
+        <ul class="list">
+            <li>Upload syllabus PDFs or paste outlines.</li>
+            <li>Generate career roadmaps with projects and skills.</li>
+            <li>Track any task as done to keep momentum.</li>
+            <li>Save your progress securely in Supabase.</li>
+        </ul>
+    </div>
+</section>
+{% endblock %}
