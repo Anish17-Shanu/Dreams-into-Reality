@@ -10,6 +10,8 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - Preview/edit topics before generating a roadmap
 - Confetti celebration for completed tasks
 - Background resource fetch with status indicator
+- Practice Vault with self-scoring prompts and an API endpoint for question retrieval
+- PYQ 10-year tracker per UPSC exam (links to official PYQ portal)
 - Resource discovery and ranking from free public APIs
 - Resource feedback (rating/flagging) and refresh controls
 - Evidence uploads, notes, and exports (CSV + calendar)
@@ -90,11 +92,18 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **No-API fallback**: A stronger rule-based parser handles bullets, units, and numbered sections when no AI is configured.
 - **Render tip**: `AUTO_FETCH_RESOURCES_ON_CREATE=true` triggers background fetching so creation stays fast.
 - **Career templates**: We query ESCO for occupation skills when you choose `career` and don’t show a fixed list.
+- **UPSC resources**: Official UPSC exam calendar and previous question papers are linked from UPSC public pages.
 
 ## Roadmap Creation
 - **Syllabus**: Paste topics or upload a PDF/TXT. Topics become tasks.
 - **Career**: Use a built-in career template (e.g., `frontend developer`, `data analyst`) or paste your own outline.
 - **Adaptive schedule**: Leave timeline weeks blank to auto-calculate based on study hours.
+- **UPSC**: Type “UPSC” in title to trigger the UPSC master template (all major exams + resources).
+- **PYQ portal**: UPSC PYQs are linked (not copied) and tracked via the built-in 10-year tracker.
+
+## Practice Vault API
+- `GET /api/roadmap/<roadmap_id>/questions`
+- `POST /api/questions/<question_id>/attempt`
 
 ## Folder Structure
 ```

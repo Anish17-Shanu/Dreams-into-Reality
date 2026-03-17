@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, session, url_for, current_app, flash, send_file
 from extensions import db
-from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin
+from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin, Question, QuestionAttempt, PyqCompletion
 from datetime import datetime, timedelta, date
 from werkzeug.utils import secure_filename
 from urllib.parse import quote
@@ -69,6 +69,50 @@ CAREER_TEMPLATES = {
         ],
     },
 }
+
+UPSC_TEMPLATE_TOPICS = [
+    "Civil Services Preliminary: General Studies Paper I",
+    "Civil Services Preliminary: CSAT",
+    "Civil Services Mains: Essay",
+    "Civil Services Mains: General Studies I",
+    "Civil Services Mains: General Studies II",
+    "Civil Services Mains: General Studies III",
+    "Civil Services Mains: General Studies IV (Ethics)",
+    "Civil Services Mains: Optional Subject (choose one)",
+    "Indian Forest Service Preliminary: GS + CSAT",
+    "Indian Forest Service Mains: Optional Subject",
+    "Combined Defence Services: English",
+    "Combined Defence Services: General Knowledge",
+    "Combined Defence Services: Elementary Mathematics",
+    "National Defence Academy: Mathematics",
+    "National Defence Academy: General Ability",
+    "CAPF (AC): General Ability & Intelligence",
+    "Engineering Services: General Studies & Engineering Aptitude",
+    "Engineering Services: Technical Papers (choose branch)",
+    "IES/ISS: Statistics/Economics Papers",
+    "Combined Medical Services: Paper I",
+    "Combined Medical Services: Paper II",
+    "Geologist/Geophysicist: Paper I-IV"
+]
+
+UPSC_RESOURCES = [
+    {"title": "UPSC Examination Calendar", "url": "https://upsc.gov.in/examinations/exam-calendar", "provider": "upsc"},
+    {"title": "UPSC Previous Question Papers", "url": "https://upsc.gov.in/examinations/previous-question-papers", "provider": "upsc"},
+    {"title": "UPSC Revised Syllabus & Scheme", "url": "https://upsc.gov.in/examinations/revised-syllabus-scheme", "provider": "upsc"},
+]
+
+UPSC_EXAMS = [
+    "Civil Services Prelims",
+    "Civil Services Mains",
+    "Indian Forest Service",
+    "Combined Defence Services",
+    "National Defence Academy",
+    "CAPF (AC)",
+    "Engineering Services",
+    "IES/ISS",
+    "Combined Medical Services",
+    "Geo-Scientist"
+]
 
 
 def login_required(view_func):
@@ -272,6 +316,32 @@ def _fetch_career_template_esco(query):
                 seen.add(key)
                 cleaned.append(normalized)
     return cleaned[:40]
+
+
+def _ensure_upsc_question_bank():
+    if Question.query.filter_by(exam="UPSC").first():
+        return
+    questions = []
+    for topic in UPSC_TEMPLATE_TOPICS:
+        questions.append({
+            "exam": "UPSC",
+            "subject": topic.split(":")[0],
+            "topic": topic,
+            "question_text": f"Explain the key ideas in {topic} and mention two recent examples.",
+            "answer_text": "Answer outline: define terms, list core concepts, add recent example and impact.",
+            "difficulty": "medium"
+        })
+        questions.append({
+            "exam": "UPSC",
+            "subject": topic.split(":")[0],
+            "topic": topic,
+            "question_text": f"Write a 150-word note on {topic}.",
+            "answer_text": "Answer outline: intro (2-3 lines), body (key points), conclusion (future direction).",
+            "difficulty": "medium"
+        })
+    for item in questions[:240]:
+        db.session.add(Question(**item))
+    db.session.commit()
 
 
 def _supabase_client():
@@ -607,19 +677,28 @@ def create_roadmap():
                 if template_key in key:
                     match = CAREER_TEMPLATES[template_key]
                     break
-            esco_topics = _fetch_career_template_esco(title)
-            if esco_topics:
-                topics = esco_topics
+            if "upsc" in key:
+                topics = UPSC_TEMPLATE_TOPICS
                 projects = [
-                    f"Build a {title} portfolio",
-                    f"{title} case study with real data",
-                    f"Showcase project: {title} mini product"
+                    "PYQ drill: last 10 years (set weekly targets)",
+                    "Mock test sprint every 2 weeks",
+                    "Optional subject deep dive"
                 ]
-            elif match:
-                topics = match["topics"]
-                projects = match["projects"]
+                _ensure_upsc_question_bank()
             else:
-                topics = _extract_topics_from_text(raw_text)
+                esco_topics = _fetch_career_template_esco(title)
+                if esco_topics:
+                    topics = esco_topics
+                    projects = [
+                        f"Build a {title} portfolio",
+                        f"{title} case study with real data",
+                        f"Showcase project: {title} mini product"
+                    ]
+                elif match:
+                    topics = match["topics"]
+                    projects = match["projects"]
+                else:
+                    topics = _extract_topics_from_text(raw_text)
         else:
             topics = _extract_topics_from_text(raw_text)
 
@@ -692,6 +771,17 @@ def create_roadmap():
                 task.last_resource_refresh = None
 
         db.session.commit()
+        if "upsc" in _normalize(title):
+            for res in UPSC_RESOURCES:
+                db.session.add(Resource(
+                    provider=res["provider"],
+                    title=res["title"],
+                    url=res["url"],
+                    summary="Official UPSC resource",
+                    score=0.9,
+                    task_id=task_ids[0]
+                ))
+            db.session.commit()
         if auto_fetch:
             thread = threading.Thread(
                 target=_background_fetch_resources,
@@ -787,6 +877,108 @@ def update_task_status(roadmap_id, task_id):
     if new_status == "done":
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id, celebrate=1, _anchor=f"task-{task.id}"))
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/practice', methods=['GET', 'POST'])
+@login_required
+def practice(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    _ensure_upsc_question_bank()
+    questions = Question.query.filter_by(exam="UPSC").limit(60).all()
+    attempts = {a.question_id: a for a in QuestionAttempt.query.filter_by(user_id=session['user_id']).all()}
+    current_year = datetime.utcnow().year
+    years = list(range(current_year - 9, current_year + 1))
+    completions = PyqCompletion.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).all()
+    done_map = {}
+    for c in completions:
+        done_map.setdefault(c.exam, []).append(c.year)
+    return render_template("practice.html", roadmap=roadmap, questions=questions, attempts=attempts, years=years, exams=UPSC_EXAMS, done_map=done_map)
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/pyq', methods=['POST'])
+@login_required
+def pyq_tracker(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    exam = request.form.get("exam", "UPSC")
+    selected_years = request.form.getlist("years")
+    PyqCompletion.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id, exam=exam).delete()
+    for year_str in selected_years:
+        try:
+            year = int(year_str)
+        except ValueError:
+            continue
+        db.session.add(PyqCompletion(
+            exam=exam,
+            year=year,
+            user_id=session['user_id'],
+            roadmap_id=roadmap.id
+        ))
+    db.session.commit()
+    return redirect(url_for('dashboard.practice', roadmap_id=roadmap.id))
+
+
+@dashboard_bp.route('/questions/<int:question_id>/attempt', methods=['POST'])
+@login_required
+def attempt_question(question_id):
+    question = Question.query.get_or_404(question_id)
+    score = int(request.form.get('score', 0))
+    score = max(0, min(5, score))
+    notes = request.form.get('notes', '').strip() or None
+    attempt = QuestionAttempt(
+        score=score,
+        notes=notes,
+        user_id=session['user_id'],
+        question_id=question.id
+    )
+    db.session.add(attempt)
+    db.session.commit()
+    return redirect(request.referrer or url_for('dashboard.dashboard'))
+
+
+@dashboard_bp.route('/api/roadmap/<int:roadmap_id>/questions')
+@login_required
+def api_questions(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return {"error": "unauthorized"}, 403
+    _ensure_upsc_question_bank()
+    questions = Question.query.filter_by(exam="UPSC").limit(100).all()
+    payload = [
+        {
+            "id": q.id,
+            "exam": q.exam,
+            "subject": q.subject,
+            "topic": q.topic,
+            "question": q.question_text,
+            "answer": q.answer_text,
+            "difficulty": q.difficulty
+        }
+        for q in questions
+    ]
+    return {"questions": payload}
+
+
+@dashboard_bp.route('/api/questions/<int:question_id>/attempt', methods=['POST'])
+@login_required
+def api_attempt(question_id):
+    question = Question.query.get_or_404(question_id)
+    data = request.get_json(silent=True) or {}
+    score = int(data.get("score", 0))
+    score = max(0, min(5, score))
+    notes = data.get("notes")
+    attempt = QuestionAttempt(
+        score=score,
+        notes=notes,
+        user_id=session['user_id'],
+        question_id=question.id
+    )
+    db.session.add(attempt)
+    db.session.commit()
+    return {"status": "ok", "attempt_id": attempt.id}
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/checkin', methods=['POST'])

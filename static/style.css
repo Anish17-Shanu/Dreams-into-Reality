@@ -185,21 +185,21 @@ a {
     box-shadow: 0 10px 30px rgba(255, 141, 179, 0.3);
 }
 
-.calm .stars,
-.calm .mist,
-.calm .floating-cloud,
-.calm .confetti {
+body.calm .stars,
+body.calm .mist,
+body.calm .floating-cloud,
+body.calm .confetti {
     display: none;
 }
 
-.calm body,
-.calm .hero,
-.calm .panel,
-.calm .auth-card,
-.calm .card,
-.calm .task-card,
-.calm .resource-card,
-.calm .resource-list a {
+body.calm,
+body.calm .hero,
+body.calm .panel,
+body.calm .auth-card,
+body.calm .card,
+body.calm .task-card,
+body.calm .resource-card,
+body.calm .resource-list a {
     background: rgba(15, 18, 30, 0.92);
 }
 
@@ -565,6 +565,46 @@ button:hover,
     border-radius: 14px;
     border: 1px solid var(--border);
     background: rgba(7, 10, 24, 0.85);
+}
+
+.question-grid {
+    display: grid;
+    gap: 18px;
+    margin-top: 18px;
+}
+
+.question-card {
+    background: rgba(11, 16, 38, 0.65);
+    border-radius: 18px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    display: grid;
+    gap: 12px;
+}
+
+.pyq-tracker {
+    margin: 18px 0 28px;
+    padding: 18px;
+    border-radius: 18px;
+    border: 1px dashed var(--border);
+    background: rgba(11, 16, 38, 0.55);
+}
+
+.year-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    gap: 10px;
+}
+
+.year-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 0.85rem;
 }
 
 .resource-feedback {

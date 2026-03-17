@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div>
+        <h1>Practice Vault</h1>
+        <p class="muted">Self-check your progress with prompt-style questions and quick scoring.</p>
+    </div>
+    <div class="pyq-tracker">
+        <h3>PYQ 10-Year Tracker</h3>
+        <p class="muted">Mark completed years for each exam. We link official UPSC PYQ portal in the roadmap.</p>
+        <form method="POST" action="{{ url_for('dashboard.pyq_tracker', roadmap_id=roadmap.id) }}" class="stack" data-done='{{ done_map | tojson }}'>
+            <label>
+                Exam
+                <select name="exam" id="pyq-exam">
+                    {% for exam in exams %}
+                        <option value="{{ exam }}">{{ exam }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="year-grid" id="pyq-years">
+                {% for year in years %}
+                    <label class="year-pill">
+                        <input type="checkbox" name="years" value="{{ year }}">
+                        {{ year }}
+                    </label>
+                {% endfor %}
+            </div>
+            <button type="submit">Save PYQ Progress</button>
+        </form>
+    </div>
+    <div class="question-grid">
+        {% for q in questions %}
+            <article class="question-card">
+                <h3>{{ q.question_text }}</h3>
+                <p class="muted">Topic: {{ q.topic }}</p>
+                <details>
+                    <summary>Show answer outline</summary>
+                    <p class="muted">{{ q.answer_text }}</p>
+                </details>
+                <form method="POST" action="{{ url_for('dashboard.attempt_question', question_id=q.id) }}" class="inline-form">
+                    <label>
+                        Score (0-5)
+                        <input type="number" name="score" min="0" max="5" value="3">
+                    </label>
+                    <input type="text" name="notes" placeholder="Notes">
+                    <button type="submit">Save</button>
+                </form>
+                {% if attempts.get(q.id) %}
+                    <p class="muted">Last score: {{ attempts.get(q.id).score }}</p>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </div>
+</section>
+<script>
+    const form = document.querySelector(".pyq-tracker form");
+    const examSelect = document.getElementById("pyq-exam");
+    const yearGrid = document.getElementById("pyq-years");
+    const doneMap = form ? JSON.parse(form.dataset.done || "{}") : {};
+    function syncYears() {
+        const exam = examSelect.value;
+        const doneYears = new Set(doneMap[exam] || []);
+        yearGrid.querySelectorAll("input[type='checkbox']").forEach(cb => {
+            cb.checked = doneYears.has(parseInt(cb.value, 10));
+        });
+    }
+    if (examSelect) {
+        examSelect.addEventListener("change", syncYears);
+        syncYears();
+    }
+</script>
+{% endblock %}

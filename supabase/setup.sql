@@ -80,6 +80,41 @@ create table if not exists checkin (
   roadmap_id bigint not null references roadmap(id) on delete cascade
 );
 
+create table if not exists question (
+  id bigserial primary key,
+  exam varchar(80) not null,
+  subject varchar(120),
+  topic varchar(160),
+  question_text text not null,
+  answer_text text,
+  difficulty varchar(20) default 'medium',
+  is_public boolean default true,
+  created_at timestamp without time zone default now()
+);
+
+create table if not exists question_attempt (
+  id bigserial primary key,
+  score integer default 0,
+  notes varchar(400),
+  attempted_at timestamp without time zone default now(),
+  user_id bigint not null references "user"(id) on delete cascade,
+  question_id bigint not null references question(id) on delete cascade
+);
+
+create table if not exists pyq_completion (
+  id bigserial primary key,
+  exam varchar(120) not null,
+  year integer not null,
+  completed_at timestamp without time zone default now(),
+  user_id bigint not null references "user"(id) on delete cascade,
+  roadmap_id bigint not null references roadmap(id) on delete cascade
+);
+
+create index if not exists idx_pyq_user on pyq_completion(user_id);
+
+create index if not exists idx_question_exam on question(exam);
+create index if not exists idx_attempt_user on question_attempt(user_id);
+
 create index if not exists idx_roadmap_user_id on roadmap(user_id);
 create index if not exists idx_task_roadmap_id on task(roadmap_id);
 create index if not exists idx_resource_task_id on resource(task_id);

@@ -83,3 +83,33 @@ class Checkin(db.Model):
     note = db.Column(db.String(300), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     roadmap_id = db.Column(db.Integer, db.ForeignKey('roadmap.id'), nullable=False)
+
+
+class Question(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    exam = db.Column(db.String(80), nullable=False)  # e.g., UPSC
+    subject = db.Column(db.String(120), nullable=True)
+    topic = db.Column(db.String(160), nullable=True)
+    question_text = db.Column(db.Text, nullable=False)
+    answer_text = db.Column(db.Text, nullable=True)
+    difficulty = db.Column(db.String(20), default="medium")
+    is_public = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class QuestionAttempt(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    score = db.Column(db.Integer, default=0)  # 0-5 self-score
+    notes = db.Column(db.String(400), nullable=True)
+    attempted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False)
+
+
+class PyqCompletion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    exam = db.Column(db.String(120), nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    roadmap_id = db.Column(db.Integer, db.ForeignKey('roadmap.id'), nullable=False)
