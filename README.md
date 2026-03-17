@@ -12,6 +12,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - Background resource fetch with status indicator
 - Practice Vault with self-scoring prompts and an API endpoint for question retrieval
 - PYQ 10-year tracker per UPSC exam (links to official PYQ portal)
+- Mock Test Scheduler with no-extra-load planning + status tracking
 - Resource discovery and ranking from free public APIs
 - Resource feedback (rating/flagging) and refresh controls
 - Evidence uploads, notes, and exports (CSV + calendar)
@@ -104,6 +105,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 ## Practice Vault API
 - `GET /api/roadmap/<roadmap_id>/questions`
 - `POST /api/questions/<question_id>/attempt`
+- `GET /api/roadmap/<roadmap_id>/generate-test` (free AI if configured, otherwise fallback)
 
 ## Folder Structure
 ```

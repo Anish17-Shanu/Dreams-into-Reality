@@ -112,6 +112,19 @@ create table if not exists pyq_completion (
 
 create index if not exists idx_pyq_user on pyq_completion(user_id);
 
+create table if not exists mock_test_schedule (
+  id bigserial primary key,
+  title varchar(160) not null,
+  scheduled_date date not null,
+  duration_minutes integer default 90,
+  questions_count integer default 50,
+  status varchar(20) default 'planned',
+  created_at timestamp without time zone default now(),
+  roadmap_id bigint not null references roadmap(id) on delete cascade
+);
+
+create index if not exists idx_mock_roadmap on mock_test_schedule(roadmap_id);
+
 create index if not exists idx_question_exam on question(exam);
 create index if not exists idx_attempt_user on question_attempt(user_id);
 

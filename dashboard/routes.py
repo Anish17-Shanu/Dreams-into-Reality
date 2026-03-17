@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, session, url_for, current_app, flash, send_file
 from extensions import db
-from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin, Question, QuestionAttempt, PyqCompletion
+from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin, Question, QuestionAttempt, PyqCompletion, MockTestSchedule
 from datetime import datetime, timedelta, date
 from werkzeug.utils import secure_filename
 from urllib.parse import quote
@@ -113,6 +113,11 @@ UPSC_EXAMS = [
     "Combined Medical Services",
     "Geo-Scientist"
 ]
+
+FREE_TEST_PROMPT = (
+    "Create 10 multiple-choice questions with 4 options and a correct answer letter "
+    "based on the topic list below. Return JSON array with fields: question, options, answer.\n\n"
+)
 
 
 def login_required(view_func):
@@ -342,6 +347,26 @@ def _ensure_upsc_question_bank():
     for item in questions[:240]:
         db.session.add(Question(**item))
     db.session.commit()
+
+
+def _generate_free_mcq(topics):
+    if not topics:
+        return []
+    api_key = current_app.config.get("HF_API_KEY")
+    model = current_app.config.get("HF_MODEL")
+    if not api_key or not model:
+        return []
+    prompt = FREE_TEST_PROMPT + "\n".join(f"- {t}" for t in topics[:8])
+    try:
+        client = InferenceClient(model=model, token=api_key)
+        response = client.text_generation(prompt, max_new_tokens=900, temperature=0.2)
+        import json
+        parsed = json.loads(response)
+        if isinstance(parsed, list):
+            return parsed
+    except Exception:
+        return []
+    return []
 
 
 def _supabase_client():
@@ -810,6 +835,7 @@ def view_roadmap(roadmap_id):
             task.resources,
             key=lambda r: (-(r.rating_avg + r.score), r.flagged_count)
         )
+    tests = MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).order_by(MockTestSchedule.scheduled_date.asc()).all()
     return render_template(
         'roadmap_view.html',
         roadmap=roadmap,
@@ -817,7 +843,8 @@ def view_roadmap(roadmap_id):
         progress=progress,
         forecast=forecast,
         last_checkin=last_checkin,
-        resources_map=resources_map
+        resources_map=resources_map,
+        tests=tests
     )
 
 
@@ -919,6 +946,67 @@ def pyq_tracker(roadmap_id):
         ))
     db.session.commit()
     return redirect(url_for('dashboard.practice', roadmap_id=roadmap.id))
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/tests', methods=['POST'])
+@login_required
+def schedule_test(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    title = request.form.get("title", "Mock Test")
+    date_str = request.form.get("scheduled_date")
+    duration = int(request.form.get("duration_minutes", 90) or 90)
+    qcount = int(request.form.get("questions_count", 50) or 50)
+    try:
+        scheduled_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except Exception:
+        scheduled_date = datetime.utcnow().date()
+    test = MockTestSchedule(
+        title=title,
+        scheduled_date=scheduled_date,
+        duration_minutes=duration,
+        questions_count=qcount,
+        roadmap_id=roadmap.id
+    )
+    db.session.add(test)
+    db.session.commit()
+    return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/tests/<int:test_id>/status', methods=['POST'])
+@login_required
+def update_test_status(roadmap_id, test_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    test = MockTestSchedule.query.get_or_404(test_id)
+    if roadmap.user_id != session['user_id'] or test.roadmap_id != roadmap.id:
+        return redirect(url_for('dashboard.dashboard'))
+    status = request.form.get("status", "planned")
+    if status not in ["planned", "completed", "missed"]:
+        status = "planned"
+    test.status = status
+    db.session.commit()
+    return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+
+@dashboard_bp.route('/api/roadmap/<int:roadmap_id>/generate-test')
+@login_required
+def api_generate_test(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return {"error": "unauthorized"}, 403
+    topics = [t.title for t in Task.query.filter_by(roadmap_id=roadmap.id).limit(10).all()]
+    questions = _generate_free_mcq(topics)
+    if not questions:
+        questions = [
+            {
+                "question": f"Explain the key ideas in {topic}.",
+                "options": ["Definition", "Example", "Counterpoint", "Summary"],
+                "answer": "D"
+            }
+            for topic in topics[:10]
+        ]
+    return {"questions": questions}
 
 
 @dashboard_bp.route('/questions/<int:question_id>/attempt', methods=['POST'])

@@ -69,6 +69,42 @@
         </div>
     </div>
 
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Mock Test Scheduler</h2>
+                <p class="muted">Plan no‑extra‑load mock tests and track completion.</p>
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('dashboard.schedule_test', roadmap_id=roadmap.id) }}" class="inline-form">
+            <input type="text" name="title" placeholder="Mock Test - GS Paper I">
+            <input type="date" name="scheduled_date">
+            <input type="number" name="duration_minutes" min="30" max="240" value="90">
+            <input type="number" name="questions_count" min="10" max="200" value="50">
+            <button type="submit">Schedule</button>
+        </form>
+        {% if tests %}
+            <div class="task-list">
+                {% for test in tests %}
+                    <article class="task-card">
+                        <h3>{{ test.title }}</h3>
+                        <p class="muted">Date: {{ test.scheduled_date }} · {{ test.duration_minutes }} min · {{ test.questions_count }} Qs</p>
+                        <form method="POST" action="{{ url_for('dashboard.update_test_status', roadmap_id=roadmap.id, test_id=test.id) }}" class="inline-form">
+                            <select name="status">
+                                <option value="planned" {% if test.status == 'planned' %}selected{% endif %}>Planned</option>
+                                <option value="completed" {% if test.status == 'completed' %}selected{% endif %}>Completed</option>
+                                <option value="missed" {% if test.status == 'missed' %}selected{% endif %}>Missed</option>
+                            </select>
+                            <button type="submit">Update</button>
+                        </form>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="muted">No mock tests scheduled yet.</p>
+        {% endif %}
+    </div>
+
     <div class="task-list">
         {% for task in tasks %}
             <article class="task-card" id="task-{{ task.id }}">

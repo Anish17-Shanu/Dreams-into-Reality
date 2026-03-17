@@ -582,6 +582,10 @@ button:hover,
     gap: 12px;
 }
 
+.panel h2 {
+    margin: 0;
+}
+
 .pyq-tracker {
     margin: 18px 0 28px;
     padding: 18px;
