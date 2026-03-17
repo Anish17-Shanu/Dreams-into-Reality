@@ -55,6 +55,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 2. In Supabase, go to **Project Settings > Database > Connection string**.
 3. Use the **Connection string** as your `DATABASE_URL`.
 4. (Optional) Use the **Connection Pooler** for production if you expect heavy traffic.
+5. Run the SQL setup script from `supabase/setup.sql` in the Supabase SQL editor.
 
 ## Render Deployment
 1. Push this repo to GitHub.
