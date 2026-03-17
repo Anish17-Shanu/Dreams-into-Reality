@@ -27,3 +27,5 @@ class Config:
     SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "evidence")
     SIGNED_URL_EXPIRES_SECONDS = int(os.getenv("SIGNED_URL_EXPIRES_SECONDS", "600"))
     AUTO_FETCH_RESOURCES_ON_CREATE = os.getenv("AUTO_FETCH_RESOURCES_ON_CREATE", "false").lower() == "true"
+    DEFAULT_TIMEZONE = os.getenv("DEFAULT_TIMEZONE", "Asia/Kolkata")
+    ESCO_API_BASE = os.getenv("ESCO_API_BASE", "https://ec.europa.eu/esco/api")

@@ -10,6 +10,7 @@ import csv
 import io
 import math
 import requests
+import threading
 from supabase import create_client
 from huggingface_hub import InferenceClient
 
@@ -208,6 +209,69 @@ def _safe_get(url, headers=None, params=None):
     except Exception:
         return None
     return None
+
+
+def _extract_labels_from_obj(obj):
+    labels = []
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if key in ["preferredLabel", "prefLabel", "title", "name"]:
+                if isinstance(value, dict):
+                    labels.extend([v for v in value.values() if isinstance(v, str)])
+                elif isinstance(value, str):
+                    labels.append(value)
+            else:
+                labels.extend(_extract_labels_from_obj(value))
+    elif isinstance(obj, list):
+        for item in obj:
+            labels.extend(_extract_labels_from_obj(item))
+    return labels
+
+
+def _fetch_career_template_esco(query):
+    base = current_app.config.get("ESCO_API_BASE", "https://ec.europa.eu/esco/api")
+    headers = {"User-Agent": current_app.config.get("WIKIPEDIA_USER_AGENT")}
+    search_params = {
+        "type": "occupation",
+        "text": query,
+        "language": "en",
+        "limit": 1,
+        "full": "false"
+    }
+    search_url = f"{base}/search"
+    search_data = _safe_get(search_url, headers=headers, params=search_params)
+    if not search_data:
+        return []
+
+    occupation_uri = None
+    if isinstance(search_data, dict):
+        if "results" in search_data and isinstance(search_data["results"], list) and search_data["results"]:
+            occupation_uri = search_data["results"][0].get("uri") or search_data["results"][0].get("id")
+        if not occupation_uri and "_embedded" in search_data:
+            for value in search_data["_embedded"].values():
+                if isinstance(value, list) and value:
+                    occupation_uri = value[0].get("uri") or value[0].get("id")
+                    if occupation_uri:
+                        break
+    if not occupation_uri:
+        return []
+
+    detail_url = f"{base}/resource/occupation"
+    detail_data = _safe_get(detail_url, headers=headers, params={"uri": occupation_uri, "language": "en"})
+    if not detail_data:
+        return []
+
+    labels = _extract_labels_from_obj(detail_data)
+    cleaned = []
+    seen = set()
+    for label in labels:
+        normalized = re.sub(r"\s+", " ", label).strip()
+        if 2 <= len(normalized) <= 80:
+            key = normalized.lower()
+            if key not in seen:
+                seen.add(key)
+                cleaned.append(normalized)
+    return cleaned[:40]
 
 
 def _supabase_client():
@@ -416,6 +480,32 @@ def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hou
     return _schedule_items(all_items, start_date, timeline_weeks, hours_per_week, study_days_per_week)
 
 
+def _background_fetch_resources(app, roadmap_id):
+    with app.app_context():
+        if not current_app.config.get("ENABLE_EXTERNAL_RESOURCES", True):
+            return
+        roadmap = Roadmap.query.get(roadmap_id)
+        if not roadmap:
+            return
+        tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+        for task in tasks:
+            if task.resources:
+                continue
+            resources = _fetch_resources_for_topic(task.title.replace("Project: ", ""))
+            for res in resources:
+                db.session.add(Resource(
+                    provider=res["provider"],
+                    title=res["title"],
+                    url=res["url"],
+                    summary=res.get("summary", ""),
+                    score=res.get("score", 0.0),
+                    task_id=task.id
+                ))
+            task.last_resource_refresh = datetime.utcnow()
+        db.session.commit()
+        db.session.remove()
+
+
 def _calculate_forecast(roadmap):
     if roadmap.total_tasks == 0:
         return None
@@ -504,7 +594,15 @@ def create_roadmap():
                 if template_key in key:
                     match = CAREER_TEMPLATES[template_key]
                     break
-            if match:
+            esco_topics = _fetch_career_template_esco(title)
+            if esco_topics:
+                topics = esco_topics
+                projects = [
+                    f"Build a {title} portfolio",
+                    f"{title} case study with real data",
+                    f"Showcase project: {title} mini product"
+                ]
+            elif match:
                 topics = match["topics"]
                 projects = match["projects"]
             else:
@@ -541,13 +639,14 @@ def create_roadmap():
             total_hours_est=total_hours,
             hours_per_week=hours_per_week,
             study_days_per_week=study_days_per_week,
-            timezone=request.form.get('timezone', 'UTC'),
+            timezone=current_app.config.get("DEFAULT_TIMEZONE", "Asia/Kolkata"),
             user_id=session['user_id']
         )
         db.session.add(roadmap)
         db.session.flush()
 
         auto_fetch = current_app.config.get("AUTO_FETCH_RESOURCES_ON_CREATE", False)
+        task_ids = []
         for spec in task_specs:
             task = Task(
                 title=spec["title"],
@@ -559,24 +658,22 @@ def create_roadmap():
             )
             db.session.add(task)
             db.session.flush()
+            task_ids.append(task.id)
 
             if auto_fetch:
-                resources = _fetch_resources_for_topic(spec["title"].replace("Project: ", ""))
-                for res in resources:
-                    db.session.add(Resource(
-                        provider=res["provider"],
-                        title=res["title"],
-                        url=res["url"],
-                        summary=res.get("summary", ""),
-                        score=res.get("score", 0.0),
-                        task_id=task.id
-                    ))
-                task.last_resource_refresh = datetime.utcnow()
+                task.last_resource_refresh = None
 
         db.session.commit()
+        if auto_fetch:
+            thread = threading.Thread(
+                target=_background_fetch_resources,
+                args=(current_app._get_current_object(), roadmap.id),
+                daemon=True
+            )
+            thread.start()
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
-    return render_template('roadmap_new.html', templates=sorted(CAREER_TEMPLATES.keys()))
+    return render_template('roadmap_new.html')
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>')

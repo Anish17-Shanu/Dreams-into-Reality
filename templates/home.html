@@ -3,21 +3,25 @@
 <section class="hero hero-wide">
     <div>
         <span class="pill">Dreams into Reality</span>
-        <h1>Turn any syllabus or career goal into a focused roadmap.</h1>
-        <p class="muted">Upload topics, set a timeline, and track real progress with curated resources from the web.</p>
+        <h1>Make your dreams do push‑ups.</h1>
+        <p class="muted">Upload a syllabus or type a career goal. We turn the chaos into a friendly roadmap with timelines, streaks, and tiny wins that add up.</p>
         <div class="hero-actions">
-            <a class="primary" href="{{ url_for('auth.register') }}">Get started</a>
+            <a class="primary" href="{{ url_for('auth.register') }}">Start the Journey</a>
             <a class="ghost" href="{{ url_for('auth.login') }}">I already have an account</a>
+        </div>
+        <div class="spark-row">
+            <span class="spark">✨</span>
+            <span>Goal energy: loading...</span>
         </div>
     </div>
     <div class="hero-card">
-        <h3>What you can do</h3>
-        <ul class="list">
-            <li>Upload syllabus PDFs or paste outlines.</li>
-            <li>Generate career roadmaps with projects and skills.</li>
-            <li>Track any task as done to keep momentum.</li>
-            <li>Save your progress securely in Supabase.</li>
-        </ul>
+        <h3>Your dream kit</h3>
+        <div class="chip-row">
+            <span class="chip">Syllabus → Plan</span>
+            <span class="chip">Career → Skills</span>
+            <span class="chip">Tasks → Progress</span>
+        </div>
+        <p class="muted">Ship your roadmap, collect streaks, and celebrate each milestone with a little sparkle.</p>
     </div>
 </section>
 {% endblock %}

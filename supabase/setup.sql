@@ -19,7 +19,7 @@ create table if not exists roadmap (
   total_hours_est double precision default 0,
   hours_per_week integer default 6,
   study_days_per_week integer default 5,
-  timezone varchar(60) default 'UTC',
+  timezone varchar(60) default 'Asia/Kolkata',
   streak integer default 0,
   last_checkin_date date,
   created_at timestamp without time zone default now(),

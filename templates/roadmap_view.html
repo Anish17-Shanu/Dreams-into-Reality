@@ -37,7 +37,7 @@
         <form method="POST" action="{{ url_for('dashboard.checkin', roadmap_id=roadmap.id) }}" class="inline-form">
             <input type="number" name="minutes" min="0" placeholder="Minutes studied">
             <input type="text" name="note" placeholder="Reflection note (optional)">
-            <button type="submit">Check in</button>
+            <button type="submit">Log a Win</button>
         </form>
         <div class="action-links">
             <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>

@@ -20,7 +20,7 @@ class Roadmap(db.Model):
     total_hours_est = db.Column(db.Float, default=0.0)
     hours_per_week = db.Column(db.Integer, default=6)
     study_days_per_week = db.Column(db.Integer, default=5)
-    timezone = db.Column(db.String(60), default="UTC")
+    timezone = db.Column(db.String(60), default="Asia/Kolkata")
     streak = db.Column(db.Integer, default=0)
     last_checkin_date = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

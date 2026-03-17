@@ -4,6 +4,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 
 ## Features
 - Syllabus or career roadmaps with adaptive timelines (PDF/TXT/DOCX/images)
+- Dynamic career skills pulled from public career taxonomies (ESCO) when you type a career goal
 - Smart task chunking with difficulty + estimated hours
 - Progress tracking with streaks, check-ins, and forecasted finish dates
 - Resource discovery and ranking from free public APIs
@@ -44,7 +45,8 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
    SUPABASE_SERVICE_ROLE_KEY=service_role_key
    SUPABASE_STORAGE_BUCKET=evidence
    SIGNED_URL_EXPIRES_SECONDS=600
-   AUTO_FETCH_RESOURCES_ON_CREATE=false
+   AUTO_FETCH_RESOURCES_ON_CREATE=true
+   DEFAULT_TIMEZONE=Asia/Kolkata
    ```
 3. Run the app:
    ```bash
@@ -83,7 +85,8 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **AI extraction**: Turn on `AI_TOPIC_EXTRACTION_ENABLED` or check the UI box to use OpenAI's Responses API for messy syllabi.
 - **Free AI alternative**: Provide `HF_API_KEY` to use Hugging Face Inference for topic extraction if OpenAI isn't configured.
 - **No-API fallback**: A stronger rule-based parser handles bullets, units, and numbered sections when no AI is configured.
-- **Render tip**: Keep `AUTO_FETCH_RESOURCES_ON_CREATE=false` to avoid timeouts during creation. Refresh resources per task later.
+- **Render tip**: `AUTO_FETCH_RESOURCES_ON_CREATE=true` triggers background fetching so creation stays fast.
+- **Career templates**: We query ESCO for occupation skills when you choose `career` and don’t show a fixed list.
 
 ## Roadmap Creation
 - **Syllabus**: Paste topics or upload a PDF/TXT. Topics become tasks.

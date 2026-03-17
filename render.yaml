@@ -34,4 +34,6 @@ services:
       - key: SIGNED_URL_EXPIRES_SECONDS
         value: "600"
       - key: AUTO_FETCH_RESOURCES_ON_CREATE
-        value: "false"
+        value: "true"
+      - key: DEFAULT_TIMEZONE
+        value: "Asia/Kolkata"
