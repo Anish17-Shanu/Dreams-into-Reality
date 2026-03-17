@@ -640,7 +640,8 @@ def create_roadmap():
                 study_days_per_week=study_days_per_week,
                 start_date=start_date,
                 raw_text=raw_text,
-                topics="\n".join(topics)
+                topics="\n".join(topics),
+                original_topics=topics
             )
 
         if not title:

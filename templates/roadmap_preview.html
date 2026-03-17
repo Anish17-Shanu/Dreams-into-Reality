@@ -17,7 +17,46 @@
             Topics (one per line)
             <textarea name="confirmed_topics" rows="10">{{ topics }}</textarea>
         </label>
+        <div class="diff-panel" data-original="{{ original_topics | join('||') }}">
+            <h4>Topic edits</h4>
+            <p class="muted">We’ll highlight changes as you edit.</p>
+            <ul class="diff-list"></ul>
+        </div>
         <button type="submit">Generate roadmap</button>
     </form>
 </section>
+<script>
+    const diffPanel = document.querySelector(".diff-panel");
+    const diffList = document.querySelector(".diff-list");
+    const textarea = document.querySelector("textarea[name='confirmed_topics']");
+    const original = (diffPanel?.dataset.original || "")
+        .split("||")
+        .map(t => t.trim())
+        .filter(Boolean);
+
+    function refreshDiff() {
+        const current = textarea.value.split("\n").map(t => t.trim()).filter(Boolean);
+        const added = current.filter(t => !original.includes(t));
+        const removed = original.filter(t => !current.includes(t));
+        diffList.innerHTML = "";
+        if (!added.length && !removed.length) {
+            diffList.innerHTML = "<li class='muted'>No changes yet.</li>";
+            return;
+        }
+        added.forEach(item => {
+            const li = document.createElement("li");
+            li.className = "diff-add";
+            li.textContent = `+ ${item}`;
+            diffList.appendChild(li);
+        });
+        removed.forEach(item => {
+            const li = document.createElement("li");
+            li.className = "diff-remove";
+            li.textContent = `- ${item}`;
+            diffList.appendChild(li);
+        });
+    }
+    textarea.addEventListener("input", refreshDiff);
+    refreshDiff();
+</script>
 {% endblock %}

@@ -8,6 +8,8 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - Smart task chunking with difficulty + estimated hours
 - Progress tracking with streaks, check-ins, and forecasted finish dates
 - Preview/edit topics before generating a roadmap
+- Confetti celebration for completed tasks
+- Background resource fetch with status indicator
 - Resource discovery and ranking from free public APIs
 - Resource feedback (rating/flagging) and refresh controls
 - Evidence uploads, notes, and exports (CSV + calendar)

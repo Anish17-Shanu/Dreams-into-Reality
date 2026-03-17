@@ -14,6 +14,10 @@
             <span>{{ progress }}%</span>
         </div>
     </div>
+    <div class="dream-meter">
+        <div class="dream-meter-fill" style="width: {{ progress }}%"></div>
+    </div>
+    <p class="muted">Dream meter: every task adds fuel.</p>
 
     <div class="stats-grid">
         <div class="stat-card">
@@ -33,7 +37,12 @@
         </div>
         <div class="stat-card">
             <p class="muted">Resource fetch</p>
-            <h3>{{ roadmap.resource_fetch_status|capitalize }}</h3>
+            <h3>
+                {{ roadmap.resource_fetch_status|capitalize }}
+                {% if roadmap.resource_fetch_status == 'running' %}
+                    <span class="spinner" aria-hidden="true"></span>
+                {% endif %}
+            </h3>
             <p class="muted">Runs in background</p>
         </div>
     </div>

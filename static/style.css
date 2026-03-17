@@ -397,6 +397,20 @@ button:hover,
     background: linear-gradient(135deg, #ffd166, #ff8fab);
 }
 
+.dream-meter {
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+    margin: 14px 0 6px;
+}
+
+.dream-meter-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #a7f3d0, #ffd166, #ff8fab);
+    animation: glow 2.6s ease-in-out infinite;
+}
+
 .card-actions {
     display: flex;
     gap: 10px;
@@ -466,6 +480,29 @@ button:hover,
     padding: 20px;
     border: 1px solid var(--border);
     animation: rise 0.6s ease;
+}
+
+.diff-panel {
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px dashed var(--border);
+    background: rgba(11, 16, 38, 0.6);
+}
+
+.diff-list {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    display: grid;
+    gap: 6px;
+}
+
+.diff-add {
+    color: #a7f3d0;
+}
+
+.diff-remove {
+    color: #fda4af;
 }
 
 .task-meta {
@@ -568,6 +605,17 @@ button:hover,
     border: 1px solid rgba(255, 143, 171, 0.4);
 }
 
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-left: 8px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: var(--accent);
+    animation: spin 1s linear infinite;
+}
+
 @keyframes drift {
     0% { transform: translateX(0); }
     100% { transform: translateX(130vw); }
@@ -597,6 +645,15 @@ button:hover,
     0% { opacity: 0; transform: translateY(-10px); }
     20% { opacity: 1; }
     100% { opacity: 0; transform: translateY(40px); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes glow {
+    0%, 100% { filter: drop-shadow(0 0 6px rgba(255, 209, 102, 0.4)); }
+    50% { filter: drop-shadow(0 0 12px rgba(255, 143, 171, 0.7)); }
 }
 
 @media (max-width: 720px) {
