@@ -22,6 +22,9 @@ create table if not exists roadmap (
   timezone varchar(60) default 'Asia/Kolkata',
   streak integer default 0,
   last_checkin_date date,
+  resource_fetch_status varchar(20) default 'idle',
+  resource_fetch_started_at timestamp without time zone,
+  resource_fetch_completed_at timestamp without time zone,
   created_at timestamp without time zone default now(),
   updated_at timestamp without time zone default now(),
   user_id bigint not null references "user"(id) on delete cascade

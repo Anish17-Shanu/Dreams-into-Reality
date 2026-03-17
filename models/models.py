@@ -23,6 +23,9 @@ class Roadmap(db.Model):
     timezone = db.Column(db.String(60), default="Asia/Kolkata")
     streak = db.Column(db.Integer, default=0)
     last_checkin_date = db.Column(db.Date, nullable=True)
+    resource_fetch_status = db.Column(db.String(20), default="idle")  # idle | running | done | failed
+    resource_fetch_started_at = db.Column(db.DateTime, nullable=True)
+    resource_fetch_completed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

@@ -7,6 +7,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - Dynamic career skills pulled from public career taxonomies (ESCO) when you type a career goal
 - Smart task chunking with difficulty + estimated hours
 - Progress tracking with streaks, check-ins, and forecasted finish dates
+- Preview/edit topics before generating a roadmap
 - Resource discovery and ranking from free public APIs
 - Resource feedback (rating/flagging) and refresh controls
 - Evidence uploads, notes, and exports (CSV + calendar)

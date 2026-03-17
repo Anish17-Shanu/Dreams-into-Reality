@@ -94,6 +94,29 @@ a {
     animation-delay: 5s;
 }
 
+.confetti {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0;
+    background:
+        radial-gradient(circle, #ffd166 3px, transparent 4px) 10% 10%,
+        radial-gradient(circle, #ff8fab 3px, transparent 4px) 20% 30%,
+        radial-gradient(circle, #a5f3fc 3px, transparent 4px) 40% 20%,
+        radial-gradient(circle, #fbcfe8 3px, transparent 4px) 60% 25%,
+        radial-gradient(circle, #fde68a 3px, transparent 4px) 70% 40%,
+        radial-gradient(circle, #c4b5fd 3px, transparent 4px) 85% 20%,
+        radial-gradient(circle, #fca5a5 3px, transparent 4px) 30% 60%,
+        radial-gradient(circle, #fef08a 3px, transparent 4px) 70% 70%,
+        radial-gradient(circle, #a7f3d0 3px, transparent 4px) 50% 80%;
+    background-size: 120px 120px;
+}
+
+.celebrate .confetti {
+    animation: confetti-pop 2.2s ease forwards;
+}
+
 .topbar {
     position: sticky;
     top: 0;
@@ -568,6 +591,12 @@ button:hover,
 @keyframes pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.12); }
+}
+
+@keyframes confetti-pop {
+    0% { opacity: 0; transform: translateY(-10px); }
+    20% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(40px); }
 }
 
 @media (max-width: 720px) {

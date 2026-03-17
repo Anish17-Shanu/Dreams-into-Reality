@@ -487,23 +487,33 @@ def _background_fetch_resources(app, roadmap_id):
         roadmap = Roadmap.query.get(roadmap_id)
         if not roadmap:
             return
-        tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
-        for task in tasks:
-            if task.resources:
-                continue
-            resources = _fetch_resources_for_topic(task.title.replace("Project: ", ""))
-            for res in resources:
-                db.session.add(Resource(
-                    provider=res["provider"],
-                    title=res["title"],
-                    url=res["url"],
-                    summary=res.get("summary", ""),
-                    score=res.get("score", 0.0),
-                    task_id=task.id
-                ))
-            task.last_resource_refresh = datetime.utcnow()
-        db.session.commit()
-        db.session.remove()
+        try:
+            roadmap.resource_fetch_status = "running"
+            roadmap.resource_fetch_started_at = datetime.utcnow()
+            db.session.commit()
+            tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+            for task in tasks:
+                if task.resources:
+                    continue
+                resources = _fetch_resources_for_topic(task.title.replace("Project: ", ""))
+                for res in resources:
+                    db.session.add(Resource(
+                        provider=res["provider"],
+                        title=res["title"],
+                        url=res["url"],
+                        summary=res.get("summary", ""),
+                        score=res.get("score", 0.0),
+                        task_id=task.id
+                    ))
+                task.last_resource_refresh = datetime.utcnow()
+            roadmap.resource_fetch_status = "done"
+            roadmap.resource_fetch_completed_at = datetime.utcnow()
+            db.session.commit()
+        except Exception:
+            roadmap.resource_fetch_status = "failed"
+            db.session.commit()
+        finally:
+            db.session.remove()
 
 
 def _calculate_forecast(roadmap):
@@ -561,6 +571,7 @@ def create_roadmap():
         start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else datetime.utcnow().date()
 
         raw_text = request.form.get('source_text', '').strip()
+        confirmed_topics = request.form.get('confirmed_topics', '').strip()
         uploaded = request.files.get('syllabus_file')
         if uploaded and uploaded.filename:
             if not _allowed_file(uploaded.filename, {"pdf", "txt", "docx", "png", "jpg", "jpeg", "bmp", "tiff"}):
@@ -587,7 +598,9 @@ def create_roadmap():
         topics = []
         projects = []
         use_ai = request.form.get('use_ai') == 'on'
-        if roadmap_type == "career":
+        if confirmed_topics:
+            topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
+        elif roadmap_type == "career":
             key = _normalize(title)
             match = None
             for template_key in CAREER_TEMPLATES.keys():
@@ -610,12 +623,25 @@ def create_roadmap():
         else:
             topics = _extract_topics_from_text(raw_text)
 
-        if (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text:
+        if (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text and not confirmed_topics:
             ai_topics = _ai_extract_topics(raw_text)
             if not ai_topics:
                 ai_topics = _hf_extract_topics(raw_text)
             if ai_topics:
                 topics = ai_topics
+
+        if request.form.get("preview_topics") == "on" and not confirmed_topics:
+            return render_template(
+                "roadmap_preview.html",
+                title=title,
+                roadmap_type=roadmap_type,
+                timeline_weeks=timeline_weeks,
+                hours_per_week=hours_per_week,
+                study_days_per_week=study_days_per_week,
+                start_date=start_date,
+                raw_text=raw_text,
+                topics="\n".join(topics)
+            )
 
         if not title:
             title = "Dream Roadmap"
@@ -640,6 +666,7 @@ def create_roadmap():
             hours_per_week=hours_per_week,
             study_days_per_week=study_days_per_week,
             timezone=current_app.config.get("DEFAULT_TIMEZONE", "Asia/Kolkata"),
+            resource_fetch_status="idle",
             user_id=session['user_id']
         )
         db.session.add(roadmap)
@@ -756,6 +783,8 @@ def update_task_status(roadmap_id, task_id):
         task.completed_at = datetime.utcnow()
     roadmap.completed_tasks = Task.query.filter_by(roadmap_id=roadmap.id, status="done").count()
     db.session.commit()
+    if new_status == "done":
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id, celebrate=1, _anchor=f"task-{task.id}"))
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
 

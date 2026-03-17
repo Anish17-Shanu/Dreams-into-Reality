@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div>
+        <h1>Preview Your Topics</h1>
+        <p class="muted">Tweak the list below before we build your roadmap.</p>
+    </div>
+    <form method="POST" class="stack">
+        <input type="hidden" name="title" value="{{ title }}">
+        <input type="hidden" name="roadmap_type" value="{{ roadmap_type }}">
+        <input type="hidden" name="timeline_weeks" value="{{ timeline_weeks }}">
+        <input type="hidden" name="hours_per_week" value="{{ hours_per_week }}">
+        <input type="hidden" name="study_days_per_week" value="{{ study_days_per_week }}">
+        <input type="hidden" name="start_date" value="{{ start_date }}">
+        <input type="hidden" name="source_text" value="{{ raw_text }}">
+        <label>
+            Topics (one per line)
+            <textarea name="confirmed_topics" rows="10">{{ topics }}</textarea>
+        </label>
+        <button type="submit">Generate roadmap</button>
+    </form>
+</section>
+{% endblock %}
