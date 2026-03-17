@@ -152,6 +152,57 @@ def _safe_get(url, headers=None, params=None):
     return None
 
 
+def _ai_extract_topics(text):
+    api_key = current_app.config.get("OPENAI_API_KEY")
+    model = current_app.config.get("OPENAI_MODEL")
+    if not api_key or not model:
+        return []
+    prompt = (
+        "Extract a clean JSON array of unique topic strings from the syllabus text. "
+        "Keep each topic short (3-8 words). Return ONLY JSON.\n\n"
+        f"Syllabus:\n{text[:8000]}"
+    )
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model,
+        "input": [
+            {"role": "system", "content": "You extract concise topics from messy syllabi."},
+            {"role": "user", "content": prompt}
+        ],
+        "max_output_tokens": 600
+    }
+    try:
+        timeout = current_app.config.get("REQUEST_TIMEOUT_SECONDS", 8)
+        response = _request_session().post("https://api.openai.com/v1/responses", headers=headers, json=payload, timeout=timeout)
+        if response.status_code != 200:
+            return []
+        data = response.json()
+        raw = None
+        if isinstance(data, dict):
+            raw = data.get("output_text")
+            if not raw and data.get("output"):
+                for item in data["output"]:
+                    for content in item.get("content", []):
+                        if content.get("type") == "output_text":
+                            raw = content.get("text")
+                            break
+        if not raw:
+            return []
+        try:
+            import json
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [str(x).strip() for x in parsed if str(x).strip()]
+        except Exception:
+            return _extract_topics_from_text(raw)
+    except Exception:
+        return []
+    return []
+
+
 def _estimate_difficulty(topic):
     text = topic.lower()
     if any(k in text for k in ["advanced", "optimization", "security", "deep", "architecture"]):
@@ -357,6 +408,7 @@ def create_roadmap():
 
         topics = []
         projects = []
+        use_ai = request.form.get('use_ai') == 'on'
         if roadmap_type == "career":
             key = _normalize(title)
             match = None
@@ -371,6 +423,11 @@ def create_roadmap():
                 topics = _extract_topics_from_text(raw_text)
         else:
             topics = _extract_topics_from_text(raw_text)
+
+        if (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text:
+            ai_topics = _ai_extract_topics(raw_text)
+            if ai_topics:
+                topics = ai_topics
 
         if not title:
             title = "Dream Roadmap"

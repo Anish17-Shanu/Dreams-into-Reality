@@ -35,6 +35,9 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
    GITHUB_TOKEN=optional_github_token
    RESOURCE_REFRESH_DAYS=7
    REQUEST_TIMEOUT_SECONDS=8
+   OPENAI_API_KEY=your_openai_key
+   OPENAI_MODEL=gpt-5
+   AI_TOPIC_EXTRACTION_ENABLED=false
    ```
 3. Run the app:
    ```bash
@@ -69,6 +72,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **GitHub Search API**: Finds repos for hands-on learning. Add a token to avoid low rate limits.
 - **Optional OCR**: Image-based syllabus upload uses `pytesseract`. Install the Tesseract binary if you want OCR enabled.
 - **Refresh cooldown**: Resources refresh every `RESOURCE_REFRESH_DAYS` to avoid rate limits.
+- **AI extraction**: Turn on `AI_TOPIC_EXTRACTION_ENABLED` or check the UI box to use OpenAI's Responses API for messy syllabi.
 
 ## Roadmap Creation
 - **Syllabus**: Paste topics or upload a PDF/TXT. Topics become tasks.

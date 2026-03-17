@@ -15,3 +15,9 @@ services:
         value: "7"
       - key: REQUEST_TIMEOUT_SECONDS
         value: "8"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: "gpt-5"
+      - key: AI_TOPIC_EXTRACTION_ENABLED
+        value: "false"

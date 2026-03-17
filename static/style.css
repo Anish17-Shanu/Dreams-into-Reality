@@ -399,6 +399,13 @@ button,
     font-size: 0.85rem;
 }
 
+.inline-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+}
+
 .resource-list {
     display: grid;
     gap: 10px;

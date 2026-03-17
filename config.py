@@ -17,3 +17,6 @@ class Config:
     OPENALEX_EMAIL = os.getenv("OPENALEX_EMAIL", "")
     RESOURCE_REFRESH_DAYS = int(os.getenv("RESOURCE_REFRESH_DAYS", "7"))
     REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "8"))
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
+    AI_TOPIC_EXTRACTION_ENABLED = os.getenv("AI_TOPIC_EXTRACTION_ENABLED", "false").lower() == "true"
