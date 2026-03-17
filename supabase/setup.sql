@@ -125,6 +125,19 @@ create table if not exists mock_test_schedule (
 
 create index if not exists idx_mock_roadmap on mock_test_schedule(roadmap_id);
 
+create table if not exists quiz_result (
+  id bigserial primary key,
+  total_questions integer default 0,
+  correct integer default 0,
+  incorrect integer default 0,
+  score double precision default 0,
+  attempted_at timestamp without time zone default now(),
+  user_id bigint not null references "user"(id) on delete cascade,
+  roadmap_id bigint not null references roadmap(id) on delete cascade
+);
+
+create index if not exists idx_quiz_user on quiz_result(user_id);
+
 create index if not exists idx_question_exam on question(exam);
 create index if not exists idx_attempt_user on question_attempt(user_id);
 

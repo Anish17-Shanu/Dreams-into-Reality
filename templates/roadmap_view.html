@@ -60,6 +60,7 @@
         </form>
         <div class="action-links">
             <a class="ghost" href="{{ url_for('dashboard.practice', roadmap_id=roadmap.id) }}">Practice Vault</a>
+            <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">UPSC Quick Quiz</a>
             <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>
             <a class="ghost" href="{{ url_for('dashboard.export_ics', roadmap_id=roadmap.id) }}">Export Calendar</a>
             <form method="POST" action="{{ url_for('dashboard.rebalance', roadmap_id=roadmap.id) }}" class="inline-form">

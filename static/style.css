@@ -582,6 +582,21 @@ button:hover,
     gap: 12px;
 }
 
+.option-grid {
+    display: grid;
+    gap: 8px;
+}
+
+.option-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.08);
+}
+
 .panel h2 {
     margin: 0;
 }

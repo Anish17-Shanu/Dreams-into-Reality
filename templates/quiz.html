@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div>
+        <h1>UPSC Quick Quiz</h1>
+        <p class="muted">Negative marking applied: +2 for correct, -0.66 for incorrect, 0 for skipped.</p>
+    </div>
+    <form method="POST" action="{{ url_for('dashboard.quiz_submit', roadmap_id=roadmap.id) }}" class="stack">
+        <input type="hidden" name="total" value="{{ questions|length }}">
+        {% for q in questions %}
+            <article class="question-card">
+                <h3>{{ loop.index }}. {{ q.question | safe }}</h3>
+                <input type="hidden" name="a_{{ loop.index0 }}" value="{{ q.answer }}">
+                <div class="option-grid">
+                    {% for opt in q.options %}
+                        <label class="option-pill">
+                            <input type="radio" name="q_{{ loop.index0 }}" value="{{ opt }}">
+                            {{ opt | safe }}
+                        </label>
+                    {% endfor %}
+                </div>
+            </article>
+        {% endfor %}
+        <button type="submit">Submit Quiz</button>
+    </form>
+</section>
+{% endblock %}

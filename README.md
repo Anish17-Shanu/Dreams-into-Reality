@@ -45,8 +45,6 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
    OPENAI_API_KEY=your_openai_key
    OPENAI_MODEL=gpt-5
    AI_TOPIC_EXTRACTION_ENABLED=false
-   HF_API_KEY=your_hf_key
-   HF_MODEL=google/flan-t5-large
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=service_role_key
    SUPABASE_STORAGE_BUCKET=evidence
@@ -89,7 +87,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **Optional OCR**: Image-based syllabus upload uses `pytesseract`. Install the Tesseract binary if you want OCR enabled.
 - **Refresh cooldown**: Resources refresh every `RESOURCE_REFRESH_DAYS` to avoid rate limits.
 - **AI extraction**: Turn on `AI_TOPIC_EXTRACTION_ENABLED` or check the UI box to use OpenAI's Responses API for messy syllabi.
-- **Free AI alternative**: Provide `HF_API_KEY` to use Hugging Face Inference for topic extraction if OpenAI isn't configured.
+- **Free quiz source**: We fetch MCQs from Open Trivia DB when building quick quizzes.
 - **No-API fallback**: A stronger rule-based parser handles bullets, units, and numbered sections when no AI is configured.
 - **Render tip**: `AUTO_FETCH_RESOURCES_ON_CREATE=true` triggers background fetching so creation stays fast.
 - **Career templates**: We query ESCO for occupation skills when you choose `career` and don’t show a fixed list.
@@ -106,6 +104,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - `GET /api/roadmap/<roadmap_id>/questions`
 - `POST /api/questions/<question_id>/attempt`
 - `GET /api/roadmap/<roadmap_id>/generate-test` (free AI if configured, otherwise fallback)
+- UPSC Quick Quiz with negative marking (+2 correct, -0.66 incorrect)
 
 ## Folder Structure
 ```

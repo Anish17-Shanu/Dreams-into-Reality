@@ -124,3 +124,14 @@ class MockTestSchedule(db.Model):
     status = db.Column(db.String(20), default="planned")  # planned | completed | missed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     roadmap_id = db.Column(db.Integer, db.ForeignKey('roadmap.id'), nullable=False)
+
+
+class QuizResult(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    total_questions = db.Column(db.Integer, default=0)
+    correct = db.Column(db.Integer, default=0)
+    incorrect = db.Column(db.Integer, default=0)
+    score = db.Column(db.Float, default=0.0)
+    attempted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    roadmap_id = db.Column(db.Integer, db.ForeignKey('roadmap.id'), nullable=False)

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div>
+        <h1>Quiz Result</h1>
+        <p class="muted">UPSC marking: +2 correct, -0.66 incorrect.</p>
+    </div>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <p class="muted">Total Questions</p>
+            <h3>{{ result.total_questions }}</h3>
+        </div>
+        <div class="stat-card">
+            <p class="muted">Correct</p>
+            <h3>{{ result.correct }}</h3>
+        </div>
+        <div class="stat-card">
+            <p class="muted">Incorrect</p>
+            <h3>{{ result.incorrect }}</h3>
+        </div>
+        <div class="stat-card">
+            <p class="muted">Score</p>
+            <h3>{{ result.score }}</h3>
+        </div>
+    </div>
+    <a class="primary" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">Try another quiz</a>
+</section>
+{% endblock %}

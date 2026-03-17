@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, session, url_for, current_app, flash, send_file
 from extensions import db
-from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin, Question, QuestionAttempt, PyqCompletion, MockTestSchedule
+from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin, Question, QuestionAttempt, PyqCompletion, MockTestSchedule, QuizResult
 from datetime import datetime, timedelta, date
 from werkzeug.utils import secure_filename
 from urllib.parse import quote
@@ -12,7 +12,6 @@ import math
 import requests
 import threading
 from supabase import create_client
-from huggingface_hub import InferenceClient
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -114,10 +113,7 @@ UPSC_EXAMS = [
     "Geo-Scientist"
 ]
 
-FREE_TEST_PROMPT = (
-    "Create 10 multiple-choice questions with 4 options and a correct answer letter "
-    "based on the topic list below. Return JSON array with fields: question, options, answer.\n\n"
-)
+OPENTDB_API = "https://opentdb.com/api.php"
 
 
 def login_required(view_func):
@@ -349,24 +345,24 @@ def _ensure_upsc_question_bank():
     db.session.commit()
 
 
-def _generate_free_mcq(topics):
-    if not topics:
+def _fetch_opentdb_questions(amount=10, difficulty="medium"):
+    params = {"amount": amount, "type": "multiple", "difficulty": difficulty}
+    data = _safe_get(OPENTDB_API, params=params)
+    if not data or data.get("response_code") != 0:
         return []
-    api_key = current_app.config.get("HF_API_KEY")
-    model = current_app.config.get("HF_MODEL")
-    if not api_key or not model:
-        return []
-    prompt = FREE_TEST_PROMPT + "\n".join(f"- {t}" for t in topics[:8])
-    try:
-        client = InferenceClient(model=model, token=api_key)
-        response = client.text_generation(prompt, max_new_tokens=900, temperature=0.2)
-        import json
-        parsed = json.loads(response)
-        if isinstance(parsed, list):
-            return parsed
-    except Exception:
-        return []
-    return []
+    questions = []
+    for item in data.get("results", []):
+        question = item.get("question")
+        correct = item.get("correct_answer")
+        incorrect = item.get("incorrect_answers", [])
+        options = incorrect + [correct]
+        questions.append({
+            "question": question,
+            "options": options,
+            "answer": correct,
+            "category": item.get("category")
+        })
+    return questions
 
 
 def _supabase_client():
@@ -428,26 +424,6 @@ def _ai_extract_topics(text):
     return []
 
 
-def _hf_extract_topics(text):
-    api_key = current_app.config.get("HF_API_KEY")
-    model = current_app.config.get("HF_MODEL")
-    if not api_key or not model:
-        return []
-    prompt = (
-        "Extract a JSON array of unique topic strings from the syllabus text. "
-        "Keep each topic short. Return only JSON.\n\n"
-        f"Syllabus:\n{text[:8000]}"
-    )
-    try:
-        client = InferenceClient(model=model, token=api_key)
-        response = client.text_generation(prompt, max_new_tokens=400, temperature=0.1)
-        import json
-        parsed = json.loads(response)
-        if isinstance(parsed, list):
-            return [str(x).strip() for x in parsed if str(x).strip()]
-    except Exception:
-        return []
-    return []
 
 
 def _estimate_difficulty(topic):
@@ -729,8 +705,6 @@ def create_roadmap():
 
         if (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text and not confirmed_topics:
             ai_topics = _ai_extract_topics(raw_text)
-            if not ai_topics:
-                ai_topics = _hf_extract_topics(raw_text)
             if ai_topics:
                 topics = ai_topics
 
@@ -924,6 +898,51 @@ def practice(roadmap_id):
     return render_template("practice.html", roadmap=roadmap, questions=questions, attempts=attempts, years=years, exams=UPSC_EXAMS, done_map=done_map)
 
 
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/quiz', methods=['GET'])
+@login_required
+def quiz(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    questions = _fetch_opentdb_questions(amount=10, difficulty="medium")
+    if not questions:
+        flash("Quiz generator is busy. Try again in a minute.")
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+    return render_template("quiz.html", roadmap=roadmap, questions=questions)
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/quiz/submit', methods=['POST'])
+@login_required
+def quiz_submit(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    total = int(request.form.get("total", 0))
+    correct = 0
+    incorrect = 0
+    for idx in range(total):
+        selected = request.form.get(f"q_{idx}")
+        answer = request.form.get(f"a_{idx}")
+        if not selected:
+            continue
+        if selected == answer:
+            correct += 1
+        else:
+            incorrect += 1
+    score = (correct * 2) - (incorrect * (2 / 3))
+    result = QuizResult(
+        total_questions=total,
+        correct=correct,
+        incorrect=incorrect,
+        score=round(score, 2),
+        user_id=session['user_id'],
+        roadmap_id=roadmap.id
+    )
+    db.session.add(result)
+    db.session.commit()
+    return render_template("quiz_result.html", roadmap=roadmap, result=result)
+
+
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/pyq', methods=['POST'])
 @login_required
 def pyq_tracker(roadmap_id):
@@ -995,14 +1014,14 @@ def api_generate_test(roadmap_id):
     roadmap = Roadmap.query.get_or_404(roadmap_id)
     if roadmap.user_id != session['user_id']:
         return {"error": "unauthorized"}, 403
-    topics = [t.title for t in Task.query.filter_by(roadmap_id=roadmap.id).limit(10).all()]
-    questions = _generate_free_mcq(topics)
+    questions = _fetch_opentdb_questions(amount=10, difficulty="medium")
     if not questions:
+        topics = [t.title for t in Task.query.filter_by(roadmap_id=roadmap.id).limit(10).all()]
         questions = [
             {
                 "question": f"Explain the key ideas in {topic}.",
                 "options": ["Definition", "Example", "Counterpoint", "Summary"],
-                "answer": "D"
+                "answer": "Summary"
             }
             for topic in topics[:10]
         ]
