@@ -18,20 +18,35 @@
             </select>
         </label>
         <label>
-            Timeline (weeks)
-            <input type="number" name="timeline_weeks" min="2" max="52" value="8">
+            Timeline (weeks, optional)
+            <input type="number" name="timeline_weeks" min="0" max="52" value="0">
         </label>
+        <p class="muted">Leave timeline as 0 to auto-calculate based on study hours.</p>
+        <div class="inline-fields">
+            <label>
+                Study hours per week
+                <input type="number" name="hours_per_week" min="1" max="40" value="6">
+            </label>
+            <label>
+                Study days per week
+                <input type="number" name="study_days_per_week" min="1" max="7" value="5">
+            </label>
+        </div>
         <label>
             Start date
             <input type="date" name="start_date">
+        </label>
+        <label>
+            Timezone
+            <input type="text" name="timezone" placeholder="UTC">
         </label>
         <label>
             Paste your syllabus or outline
             <textarea name="source_text" rows="6" placeholder="Paste topics here, one per line."></textarea>
         </label>
         <label>
-            Upload a syllabus file (PDF/TXT)
-            <input type="file" name="syllabus_file" accept=".pdf,.txt">
+            Upload a syllabus file (PDF/TXT/DOCX/Image)
+            <input type="file" name="syllabus_file" accept=".pdf,.txt,.docx,.png,.jpg,.jpeg,.bmp,.tiff">
         </label>
         <div class="hint">
             <strong>Career templates available:</strong>

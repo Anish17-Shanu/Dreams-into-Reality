@@ -7,3 +7,6 @@ python-dotenv
 requests
 PyPDF2
 gunicorn
+python-docx
+Pillow
+pytesseract

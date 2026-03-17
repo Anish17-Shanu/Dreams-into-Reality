@@ -15,3 +15,5 @@ class Config:
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
     CROSSREF_MAILTO = os.getenv("CROSSREF_MAILTO", "")
     OPENALEX_EMAIL = os.getenv("OPENALEX_EMAIL", "")
+    RESOURCE_REFRESH_DAYS = int(os.getenv("RESOURCE_REFRESH_DAYS", "7"))
+    REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "8"))

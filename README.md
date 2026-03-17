@@ -3,9 +3,12 @@
 Dreams into Reality helps individual learners turn a **syllabus or career goal** into a structured roadmap with tasks, timelines, and curated web resources. Upload your syllabus (PDF/TXT), choose a timeline, and track every step toward your goal.
 
 ## Features
-- Syllabus or career roadmaps with task timelines
-- Progress tracking (mark any task as done or in-progress)
-- Resource discovery from free public APIs
+- Syllabus or career roadmaps with adaptive timelines (PDF/TXT/DOCX/images)
+- Smart task chunking with difficulty + estimated hours
+- Progress tracking with streaks, check-ins, and forecasted finish dates
+- Resource discovery and ranking from free public APIs
+- Resource feedback (rating/flagging) and refresh controls
+- Evidence uploads, notes, and exports (CSV + calendar)
 - Secure user accounts with saved progress (Supabase Postgres)
 - Ready for deployment on Render
 
@@ -30,6 +33,8 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
    WIKIPEDIA_USER_AGENT=DreamsIntoReality/1.0 (contact@youremail.com)
    CROSSREF_MAILTO=contact@youremail.com
    GITHUB_TOKEN=optional_github_token
+   RESOURCE_REFRESH_DAYS=7
+   REQUEST_TIMEOUT_SECONDS=8
    ```
 3. Run the app:
    ```bash
@@ -62,10 +67,13 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **Wikipedia REST API**: Used for topic summaries. Requires a clear `User-Agent`.
 - **Crossref API**: Used for academic references. Provide a `mailto` in requests.
 - **GitHub Search API**: Finds repos for hands-on learning. Add a token to avoid low rate limits.
+- **Optional OCR**: Image-based syllabus upload uses `pytesseract`. Install the Tesseract binary if you want OCR enabled.
+- **Refresh cooldown**: Resources refresh every `RESOURCE_REFRESH_DAYS` to avoid rate limits.
 
 ## Roadmap Creation
 - **Syllabus**: Paste topics or upload a PDF/TXT. Topics become tasks.
 - **Career**: Use a built-in career template (e.g., `frontend developer`, `data analyst`) or paste your own outline.
+- **Adaptive schedule**: Leave timeline weeks blank to auto-calculate based on study hours.
 
 ## Folder Structure
 ```
@@ -82,7 +90,12 @@ Dreams-into-Reality/
 - Supabase database created
 - `DATABASE_URL` set in Render
 - `SECRET_KEY` set in Render
-- Run migrations if you later add them (currently uses `db.create_all()`)
+- Run migrations when updating models:
+  ```bash
+  flask db init
+  flask db migrate -m "init"
+  flask db upgrade
+  ```
 
 ---
 

@@ -1,12 +1,15 @@
-from flask import Blueprint, render_template, request, redirect, session, url_for, current_app, flash
+from flask import Blueprint, render_template, request, redirect, session, url_for, current_app, flash, send_file
 from extensions import db
-from models.models import User, Roadmap, Task, Resource
-from datetime import datetime, timedelta
+from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin
+from datetime import datetime, timedelta, date
 from werkzeug.utils import secure_filename
+from urllib.parse import quote
 import os
 import re
+import csv
+import io
+import math
 import requests
-from urllib.parse import quote
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -81,7 +84,7 @@ def _normalize(text):
 def _extract_topics_from_text(text):
     if not text:
         return []
-    lines = [l.strip(" -•\t") for l in text.splitlines()]
+    lines = [l.strip(" -\t") for l in text.splitlines()]
     lines = [l for l in lines if len(l) > 2]
     if len(lines) <= 2:
         parts = re.split(r"[.;]\s+", text)
@@ -90,7 +93,7 @@ def _extract_topics_from_text(text):
     for item in lines:
         if item.lower() not in [u.lower() for u in unique]:
             unique.append(item)
-    return unique[:50]
+    return unique[:60]
 
 
 def _extract_text_from_pdf(file_path):
@@ -98,21 +101,85 @@ def _extract_text_from_pdf(file_path):
         from PyPDF2 import PdfReader
         reader = PdfReader(file_path)
         text = []
-        for page in reader.pages[:10]:
+        for page in reader.pages[:12]:
             text.append(page.extract_text() or "")
         return "\n".join(text).strip()
     except Exception:
         return ""
 
 
-def _safe_get(url, headers=None, params=None, timeout=8):
+def _extract_text_from_docx(file_path):
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=timeout)
+        from docx import Document
+        doc = Document(file_path)
+        return "\n".join([p.text for p in doc.paragraphs]).strip()
+    except Exception:
+        return ""
+
+
+def _extract_text_from_image(file_path):
+    try:
+        import pytesseract
+        from PIL import Image
+        return pytesseract.image_to_string(Image.open(file_path)).strip()
+    except Exception:
+        return ""
+
+
+def _allowed_file(filename, allowed_exts):
+    if "." not in filename:
+        return False
+    ext = filename.rsplit(".", 1)[1].lower()
+    return ext in allowed_exts
+
+
+def _request_session():
+    session_obj = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(max_retries=2)
+    session_obj.mount("https://", adapter)
+    session_obj.mount("http://", adapter)
+    return session_obj
+
+
+def _safe_get(url, headers=None, params=None):
+    try:
+        timeout = current_app.config.get("REQUEST_TIMEOUT_SECONDS", 8)
+        response = _request_session().get(url, headers=headers, params=params, timeout=timeout)
         if response.status_code == 200:
             return response.json()
     except Exception:
         return None
     return None
+
+
+def _estimate_difficulty(topic):
+    text = topic.lower()
+    if any(k in text for k in ["advanced", "optimization", "security", "deep", "architecture"]):
+        return "hard"
+    if any(k in text for k in ["intro", "basic", "fundamental", "overview"]):
+        return "easy"
+    return "medium"
+
+
+def _estimate_hours(topic):
+    words = len(topic.split())
+    base = 1.5
+    extra = min(words * 0.2, 2.0)
+    if "project" in topic.lower():
+        base += 2.0
+    if "capstone" in topic.lower():
+        base += 3.0
+    return round(base + extra, 1)
+
+
+def _resource_score(provider):
+    scores = {
+        "wikipedia": 0.8,
+        "crossref": 0.9,
+        "github": 0.7,
+        "openalex": 0.85,
+    }
+    return scores.get(provider, 0.6)
 
 
 def _fetch_resources_for_topic(topic):
@@ -131,7 +198,8 @@ def _fetch_resources_for_topic(topic):
             "provider": "wikipedia",
             "title": wiki_data.get("title", topic),
             "url": wiki_data["content_urls"]["desktop"]["page"],
-            "summary": wiki_data.get("extract", "")
+            "summary": wiki_data.get("extract", ""),
+            "score": _resource_score("wikipedia")
         })
 
     crossref_params = {
@@ -150,7 +218,8 @@ def _fetch_resources_for_topic(topic):
                     "provider": "crossref",
                     "title": title,
                     "url": url,
-                    "summary": "Academic reference"
+                    "summary": "Academic reference",
+                    "score": _resource_score("crossref")
                 })
 
     github_headers = {"Accept": "application/vnd.github+json", "User-Agent": user_agent}
@@ -165,31 +234,71 @@ def _fetch_resources_for_topic(topic):
                 "provider": "github",
                 "title": repo.get("full_name", topic),
                 "url": repo.get("html_url", ""),
-                "summary": repo.get("description", "")
+                "summary": repo.get("description", ""),
+                "score": _resource_score("github")
             })
 
     return resources
 
 
-def _build_tasks(roadmap_type, topics, projects, start_date, weeks):
+def _schedule_items(items, start_date, timeline_weeks, hours_per_week, study_days_per_week):
     tasks = []
+    if not items:
+        items = ["Define milestones", "Gather resources", "Start learning", "Build a mini project"]
+
+    estimated_hours = [_estimate_hours(item) for item in items]
+    total_hours = sum(estimated_hours) or 1
+    if timeline_weeks and timeline_weeks > 0:
+        total_days = max(timeline_weeks * 7, 7)
+    else:
+        total_days = max(math.ceil(total_hours / max(hours_per_week, 1) * 7), 7)
+
+    current_date = start_date
+    for idx, item in enumerate(items):
+        share = estimated_hours[idx] / total_hours
+        task_days = max(1, math.ceil(total_days * share))
+        due_date = current_date + timedelta(days=task_days)
+        tasks.append({
+            "title": item,
+            "order_index": idx + 1,
+            "due_date": due_date,
+            "difficulty": _estimate_difficulty(item),
+            "estimated_hours": estimated_hours[idx]
+        })
+        current_date = due_date
+    return tasks, total_hours, current_date
+
+
+def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week):
     all_items = topics[:]
     if roadmap_type == "career":
         for project in projects:
             all_items.append(f"Project: {project}")
-    if not all_items:
-        all_items = ["Define milestones", "Gather resources", "Start learning", "Build a mini project"]
+    return _schedule_items(all_items, start_date, timeline_weeks, hours_per_week, study_days_per_week)
 
-    total_days = max(weeks * 7, 7)
-    interval = max(total_days // len(all_items), 1)
-    for idx, item in enumerate(all_items):
-        due_date = start_date + timedelta(days=idx * interval)
-        tasks.append({
-            "title": item,
-            "order_index": idx + 1,
-            "due_date": due_date
-        })
-    return tasks
+
+def _calculate_forecast(roadmap):
+    if roadmap.total_tasks == 0:
+        return None
+    days_elapsed = max((datetime.utcnow().date() - roadmap.start_date).days, 1)
+    pace = roadmap.completed_tasks / days_elapsed
+    if pace <= 0:
+        return None
+    remaining = roadmap.total_tasks - roadmap.completed_tasks
+    est_days_left = math.ceil(remaining / pace)
+    return datetime.utcnow().date() + timedelta(days=est_days_left)
+
+
+def _update_streak(roadmap, checkin_date):
+    if roadmap.last_checkin_date is None:
+        roadmap.streak = 1
+    else:
+        delta = (checkin_date - roadmap.last_checkin_date).days
+        if delta == 1:
+            roadmap.streak += 1
+        elif delta > 1:
+            roadmap.streak = 1
+    roadmap.last_checkin_date = checkin_date
 
 
 @dashboard_bp.route('/')
@@ -213,19 +322,32 @@ def create_roadmap():
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
         roadmap_type = request.form.get('roadmap_type', 'syllabus')
-        timeline_weeks = int(request.form.get('timeline_weeks', 8))
-        timeline_weeks = max(2, min(52, timeline_weeks))
+        timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
+        timeline_weeks = max(0, min(52, timeline_weeks))
+        hours_per_week = int(request.form.get('hours_per_week', 6))
+        hours_per_week = max(1, min(40, hours_per_week))
+        study_days_per_week = int(request.form.get('study_days_per_week', 5))
+        study_days_per_week = max(1, min(7, study_days_per_week))
         start_date_str = request.form.get('start_date')
         start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else datetime.utcnow().date()
 
         raw_text = request.form.get('source_text', '').strip()
         uploaded = request.files.get('syllabus_file')
         if uploaded and uploaded.filename:
+            if not _allowed_file(uploaded.filename, {"pdf", "txt", "docx", "png", "jpg", "jpeg", "bmp", "tiff"}):
+                flash("Unsupported file type. Upload PDF, TXT, DOCX, or image files.")
+                return redirect(url_for('dashboard.create_roadmap'))
             filename = secure_filename(uploaded.filename)
-            file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+            unique_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
+            file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_name)
             uploaded.save(file_path)
-            if filename.lower().endswith(".pdf"):
+            ext = filename.lower()
+            if ext.endswith(".pdf"):
                 raw_text = _extract_text_from_pdf(file_path) or raw_text
+            elif ext.endswith(".docx"):
+                raw_text = _extract_text_from_docx(file_path) or raw_text
+            elif ext.endswith((".png", ".jpg", ".jpeg", ".bmp", ".tiff")):
+                raw_text = _extract_text_from_image(file_path) or raw_text
             else:
                 try:
                     with open(file_path, "r", encoding="utf-8") as handle:
@@ -256,26 +378,35 @@ def create_roadmap():
             flash("Please provide a syllabus text or upload a file with topics.")
             return redirect(url_for('dashboard.create_roadmap'))
 
-        target_date = start_date + timedelta(weeks=timeline_weeks)
+        task_specs, total_hours, computed_end = _build_tasks(
+            roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week
+        )
+        target_date = computed_end
+
         roadmap = Roadmap(
             title=title,
             roadmap_type=roadmap_type,
             source_text=raw_text[:5000],
             start_date=start_date,
             target_date=target_date,
-            total_tasks=0,
+            total_tasks=len(task_specs),
             completed_tasks=0,
+            total_hours_est=total_hours,
+            hours_per_week=hours_per_week,
+            study_days_per_week=study_days_per_week,
+            timezone=request.form.get('timezone', 'UTC'),
             user_id=session['user_id']
         )
         db.session.add(roadmap)
         db.session.flush()
 
-        task_specs = _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks)
         for spec in task_specs:
             task = Task(
                 title=spec["title"],
                 order_index=spec["order_index"],
                 due_date=spec["due_date"],
+                difficulty=spec["difficulty"],
+                estimated_hours=spec["estimated_hours"],
                 roadmap_id=roadmap.id
             )
             db.session.add(task)
@@ -288,10 +419,11 @@ def create_roadmap():
                     title=res["title"],
                     url=res["url"],
                     summary=res.get("summary", ""),
+                    score=res.get("score", 0.0),
                     task_id=task.id
                 ))
+            task.last_resource_refresh = datetime.utcnow()
 
-        roadmap.total_tasks = len(task_specs)
         db.session.commit()
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
@@ -306,7 +438,23 @@ def view_roadmap(roadmap_id):
         return redirect(url_for('dashboard.dashboard'))
     tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
     progress = round((roadmap.completed_tasks / roadmap.total_tasks) * 100, 2) if roadmap.total_tasks else 0
-    return render_template('roadmap_view.html', roadmap=roadmap, tasks=tasks, progress=progress)
+    forecast = _calculate_forecast(roadmap)
+    last_checkin = roadmap.last_checkin_date.strftime("%Y-%m-%d") if roadmap.last_checkin_date else "None"
+    resources_map = {}
+    for task in tasks:
+        resources_map[task.id] = sorted(
+            task.resources,
+            key=lambda r: (-(r.rating_avg + r.score), r.flagged_count)
+        )
+    return render_template(
+        'roadmap_view.html',
+        roadmap=roadmap,
+        tasks=tasks,
+        progress=progress,
+        forecast=forecast,
+        last_checkin=last_checkin,
+        resources_map=resources_map
+    )
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/task/<int:task_id>/status', methods=['POST'])
@@ -316,12 +464,191 @@ def update_task_status(roadmap_id, task_id):
     task = Task.query.get_or_404(task_id)
     if roadmap.user_id != session['user_id'] or task.roadmap_id != roadmap.id:
         return redirect(url_for('dashboard.dashboard'))
+
     new_status = request.form.get('status', 'todo')
     if new_status not in ["todo", "doing", "done"]:
         new_status = "todo"
-    if task.status != new_status:
-        task.status = new_status
+    task.status = new_status
+
+    task.completion_type = request.form.get('completion_type', 'planned')
+    if task.completion_type not in ["planned", "alternative"]:
+        task.completion_type = "planned"
+    task.notes = request.form.get('notes', '').strip() or None
+
+    try:
+        task.actual_hours = float(request.form.get('actual_hours', task.actual_hours or 0))
+    except ValueError:
+        pass
+
+    evidence = request.files.get('evidence')
+    if evidence and evidence.filename:
+        if not _allowed_file(evidence.filename, {"pdf", "png", "jpg", "jpeg", "txt", "docx"}):
+            flash("Unsupported evidence file type.")
+            return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+        filename = secure_filename(evidence.filename)
+        unique_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
+        file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_name)
+        evidence.save(file_path)
+        task.evidence_path = unique_name
+
+    if new_status == "done":
+        task.completed_at = datetime.utcnow()
     roadmap.completed_tasks = Task.query.filter_by(roadmap_id=roadmap.id, status="done").count()
+    db.session.commit()
+    return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/checkin', methods=['POST'])
+@login_required
+def checkin(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    minutes = int(request.form.get('minutes', 0) or 0)
+    note = request.form.get('note', '').strip() or None
+    today = date.today()
+    checkin = Checkin(checkin_date=today, minutes=minutes, note=note, roadmap_id=roadmap.id)
+    db.session.add(checkin)
+    _update_streak(roadmap, today)
+    db.session.commit()
+    return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/task/<int:task_id>/refresh', methods=['POST'])
+@login_required
+def refresh_resources(roadmap_id, task_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    task = Task.query.get_or_404(task_id)
+    if roadmap.user_id != session['user_id'] or task.roadmap_id != roadmap.id:
+        return redirect(url_for('dashboard.dashboard'))
+
+    refresh_days = current_app.config.get("RESOURCE_REFRESH_DAYS", 7)
+    if task.last_resource_refresh and (datetime.utcnow() - task.last_resource_refresh).days < refresh_days:
+        flash("Resources were refreshed recently. Try again later.")
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+    Resource.query.filter_by(task_id=task.id).delete()
+    resources = _fetch_resources_for_topic(task.title.replace("Project: ", ""))
+    for res in resources:
+        db.session.add(Resource(
+            provider=res["provider"],
+            title=res["title"],
+            url=res["url"],
+            summary=res.get("summary", ""),
+            score=res.get("score", 0.0),
+            task_id=task.id
+        ))
+    task.last_resource_refresh = datetime.utcnow()
+    db.session.commit()
+    return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/resource/<int:resource_id>/feedback', methods=['POST'])
+@login_required
+def resource_feedback(roadmap_id, resource_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    resource = Resource.query.get_or_404(resource_id)
+    if roadmap.user_id != session['user_id'] or resource.task.roadmap_id != roadmap.id:
+        return redirect(url_for('dashboard.dashboard'))
+    rating = request.form.get('rating')
+    flagged = request.form.get('flagged') == 'true'
+    comment = request.form.get('comment', '').strip() or None
+    feedback = ResourceFeedback(
+        rating=int(rating) if rating else None,
+        flagged=flagged,
+        comment=comment,
+        resource_id=resource.id
+    )
+    db.session.add(feedback)
+    if rating:
+        rating_val = int(rating)
+        total = resource.rating_avg * resource.rating_count + rating_val
+        resource.rating_count += 1
+        resource.rating_avg = round(total / resource.rating_count, 2)
+    if flagged:
+        resource.flagged_count += 1
+    db.session.commit()
+    return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/export.csv')
+@login_required
+def export_csv(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Task", "Status", "Due Date", "Estimated Hours", "Actual Hours", "Difficulty"])
+    for task in tasks:
+        writer.writerow([
+            task.title,
+            task.status,
+            task.due_date,
+            task.estimated_hours,
+            task.actual_hours,
+            task.difficulty
+        ])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode("utf-8")), mimetype="text/csv",
+                     as_attachment=True, download_name="roadmap.csv")
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/export.ics')
+@login_required
+def export_ics(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//DreamsIntoReality//Roadmap//EN"]
+    for task in tasks:
+        if not task.due_date:
+            continue
+        dt = task.due_date.strftime("%Y%m%d")
+        lines.extend([
+            "BEGIN:VEVENT",
+            f"UID:task-{task.id}@dreams",
+            f"DTSTART;VALUE=DATE:{dt}",
+            f"DTEND;VALUE=DATE:{dt}",
+            f"SUMMARY:{task.title}",
+            "END:VEVENT"
+        ])
+    lines.append("END:VCALENDAR")
+    content = "\n".join(lines)
+    return send_file(io.BytesIO(content.encode("utf-8")), mimetype="text/calendar",
+                     as_attachment=True, download_name="roadmap.ics")
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/rebalance', methods=['POST'])
+@login_required
+def rebalance(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    remaining_tasks = Task.query.filter_by(roadmap_id=roadmap.id).filter(Task.status != "done").order_by(Task.order_index.asc()).all()
+    if not remaining_tasks:
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+    start_date = datetime.utcnow().date()
+    timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
+    titles = [t.title for t in remaining_tasks]
+    task_specs, total_hours, computed_end = _schedule_items(
+        titles,
+        start_date,
+        timeline_weeks,
+        roadmap.hours_per_week,
+        roadmap.study_days_per_week
+    )
+    for idx, spec in enumerate(task_specs):
+        if idx >= len(remaining_tasks):
+            break
+        task = remaining_tasks[idx]
+        task.due_date = spec["due_date"]
+        task.estimated_hours = spec["estimated_hours"]
+    roadmap.target_date = computed_end
+    roadmap.total_hours_est = total_hours
     db.session.commit()
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
@@ -336,3 +663,12 @@ def delete_roadmap(roadmap_id):
     db.session.commit()
     return redirect(url_for('dashboard.dashboard'))
 
+
+@dashboard_bp.route('/uploads/<filename>')
+@login_required
+def get_upload(filename):
+    safe_name = secure_filename(filename)
+    file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], safe_name)
+    if not os.path.isfile(file_path):
+        return redirect(url_for('dashboard.dashboard'))
+    return send_file(file_path, as_attachment=True)

@@ -15,30 +15,107 @@
         </div>
     </div>
 
+    <div class="stats-grid">
+        <div class="stat-card">
+            <p class="muted">Streak</p>
+            <h3>{{ roadmap.streak }} days</h3>
+            <p class="muted">Last check-in: {{ last_checkin }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="muted">Estimated hours</p>
+            <h3>{{ roadmap.total_hours_est }}</h3>
+            <p class="muted">{{ roadmap.hours_per_week }} hrs/week</p>
+        </div>
+        <div class="stat-card">
+            <p class="muted">Forecast</p>
+            <h3>{{ forecast if forecast else 'Build momentum' }}</h3>
+            <p class="muted">Based on your pace</p>
+        </div>
+    </div>
+
+    <div class="panel-actions">
+        <form method="POST" action="{{ url_for('dashboard.checkin', roadmap_id=roadmap.id) }}" class="inline-form">
+            <input type="number" name="minutes" min="0" placeholder="Minutes studied">
+            <input type="text" name="note" placeholder="Reflection note (optional)">
+            <button type="submit">Check in</button>
+        </form>
+        <div class="action-links">
+            <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>
+            <a class="ghost" href="{{ url_for('dashboard.export_ics', roadmap_id=roadmap.id) }}">Export Calendar</a>
+            <form method="POST" action="{{ url_for('dashboard.rebalance', roadmap_id=roadmap.id) }}" class="inline-form">
+                <input type="number" name="timeline_weeks" min="0" max="52" placeholder="Weeks">
+                <button type="submit" class="ghost">Rebalance timeline</button>
+            </form>
+        </div>
+    </div>
+
     <div class="task-list">
         {% for task in tasks %}
             <article class="task-card">
                 <div class="task-meta">
                     <span class="task-index">#{{ task.order_index }}</span>
-                    <h3>{{ task.title }}</h3>
+                    <div>
+                        <h3>{{ task.title }}</h3>
+                        <p class="muted">Due: {{ task.due_date or 'Flexible' }} | Difficulty: {{ task.difficulty }}</p>
+                    </div>
                 </div>
-                <p class="muted">Due: {{ task.due_date or 'Flexible' }}</p>
-                <form method="POST" action="{{ url_for('dashboard.update_task_status', roadmap_id=roadmap.id, task_id=task.id) }}" class="task-actions">
+                <div class="task-details">
+                    <p class="muted">Estimated: {{ task.estimated_hours }} hrs | Actual: {{ task.actual_hours }} hrs</p>
+                    {% if task.evidence_path %}
+                        <a class="ghost" href="{{ url_for('dashboard.get_upload', filename=task.evidence_path) }}">Download evidence</a>
+                    {% endif %}
+                </div>
+                <form method="POST" action="{{ url_for('dashboard.update_task_status', roadmap_id=roadmap.id, task_id=task.id) }}" class="task-actions" enctype="multipart/form-data">
                     <select name="status">
                         <option value="todo" {% if task.status == 'todo' %}selected{% endif %}>To do</option>
                         <option value="doing" {% if task.status == 'doing' %}selected{% endif %}>In progress</option>
                         <option value="done" {% if task.status == 'done' %}selected{% endif %}>Done</option>
                     </select>
+                    <select name="completion_type">
+                        <option value="planned" {% if task.completion_type == 'planned' %}selected{% endif %}>As planned</option>
+                        <option value="alternative" {% if task.completion_type == 'alternative' %}selected{% endif %}>Done differently</option>
+                    </select>
+                    <input type="number" step="0.5" name="actual_hours" placeholder="Actual hours">
+                    <input type="text" name="notes" placeholder="Notes or reflection">
+                    <input type="file" name="evidence">
                     <button type="submit">Update</button>
                 </form>
-                {% if task.resources %}
+
+                <div class="resource-header">
+                    <h4>Resources</h4>
+                    <form method="POST" action="{{ url_for('dashboard.refresh_resources', roadmap_id=roadmap.id, task_id=task.id) }}">
+                        <button type="submit" class="ghost">Refresh</button>
+                    </form>
+                </div>
+
+                {% set resources = resources_map.get(task.id, []) %}
+                {% if resources %}
                     <div class="resource-list">
-                        {% for res in task.resources %}
-                            <a href="{{ res.url }}" target="_blank" rel="noopener">
-                                <span class="resource-pill">{{ res.provider|capitalize }}</span>
-                                <strong>{{ res.title }}</strong>
-                                <span class="muted">{{ res.summary }}</span>
-                            </a>
+                        {% for res in resources %}
+                            <div class="resource-card">
+                                <a href="{{ res.url }}" target="_blank" rel="noopener">
+                                    <span class="resource-pill">{{ res.provider|capitalize }}</span>
+                                    <strong>{{ res.title }}</strong>
+                                    <span class="muted">{{ res.summary }}</span>
+                                    <span class="muted">Rating: {{ res.rating_avg }} ({{ res.rating_count }})</span>
+                                </a>
+                                <form method="POST" action="{{ url_for('dashboard.resource_feedback', roadmap_id=roadmap.id, resource_id=res.id) }}" class="resource-feedback">
+                                    <select name="rating">
+                                        <option value="">Rate</option>
+                                        <option value="5">5</option>
+                                        <option value="4">4</option>
+                                        <option value="3">3</option>
+                                        <option value="2">2</option>
+                                        <option value="1">1</option>
+                                    </select>
+                                    <label class="flag-label">
+                                        <input type="checkbox" name="flagged" value="true">
+                                        Flag
+                                    </label>
+                                    <input type="text" name="comment" placeholder="Quick feedback">
+                                    <button type="submit">Send</button>
+                                </form>
+                            </div>
                         {% endfor %}
                     </div>
                 {% else %}

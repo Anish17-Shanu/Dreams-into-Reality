@@ -11,3 +11,7 @@ services:
         sync: false
       - key: ENABLE_EXTERNAL_RESOURCES
         value: "true"
+      - key: RESOURCE_REFRESH_DAYS
+        value: "7"
+      - key: REQUEST_TIMEOUT_SECONDS
+        value: "8"
