@@ -4,7 +4,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 
 ## Features
 - Syllabus or career roadmaps with adaptive timelines (PDF/TXT/DOCX/images)
-- Dedicated UPSC roadmap mode with built-in strategy, PYQ practice, revision blocks, and automatic mock-test scheduling
+- Dedicated UPSC roadmap mode with subject selection, official portal syllabus snapshot, PYQ practice, revision blocks, and automatic mock-test scheduling
 - Dynamic career skills pulled from public career taxonomies (ESCO) when you type a career goal
 - Smart task chunking with difficulty + estimated hours
 - Progress tracking with streaks, check-ins, and forecasted finish dates

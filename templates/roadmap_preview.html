@@ -12,6 +12,9 @@
         <input type="hidden" name="hours_per_week" value="{{ hours_per_week }}">
         <input type="hidden" name="study_days_per_week" value="{{ study_days_per_week }}">
         <input type="hidden" name="start_date" value="{{ start_date }}">
+        <input type="hidden" name="upsc_focus" value="{{ upsc_focus or '' }}">
+        <input type="hidden" name="upsc_optional_subject" value="{{ upsc_optional_subject or '' }}">
+        <input type="hidden" name="selected_upsc_subjects" value="{{ selected_upsc_subjects or '' }}">
         <textarea name="source_text" hidden>{{ raw_text }}</textarea>
         <div class="topic-review-grid">
             <div class="topic-original">

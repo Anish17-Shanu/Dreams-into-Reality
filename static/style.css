@@ -611,6 +611,27 @@ button:hover,
     margin-top: 8px;
 }
 
+.subject-picker {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    background: rgba(11, 16, 38, 0.45);
+}
+
+.subject-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.subject-grid label {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 0.95rem;
+}
+
 .diff-list {
     list-style: none;
     padding: 0;

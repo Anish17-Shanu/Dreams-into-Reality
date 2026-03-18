@@ -98,6 +98,7 @@ UPSC_RESOURCES = [
     {"title": "UPSC Examination Calendar", "url": "https://upsc.gov.in/examinations/exam-calendar", "provider": "upsc"},
     {"title": "UPSC Previous Question Papers", "url": "https://upsc.gov.in/examinations/previous-question-papers", "provider": "upsc"},
     {"title": "UPSC Revised Syllabus & Scheme", "url": "https://upsc.gov.in/examinations/revised-syllabus-scheme", "provider": "upsc"},
+    {"title": "UPSC Model Question and Answer Booklets", "url": "https://upsc.gov.in/examination/model-question-and-answer-booklets", "provider": "upsc"},
     {"title": "Press Information Bureau", "url": "https://pib.gov.in", "provider": "official"},
     {"title": "PRS Legislative Research", "url": "https://prsindia.org", "provider": "research"},
     {"title": "NCERT Textbooks Portal", "url": "https://ncert.nic.in/textbook.php", "provider": "ncert"},
@@ -173,6 +174,107 @@ UPSC_STAGE_TOPICS = {
         "Mock interview practice",
         "Communication, posture and confidence",
     ],
+}
+
+UPSC_SUBJECT_LIBRARY = {
+    "foundation": {
+        "label": "Foundation and Strategy",
+        "topics": [
+            "UPSC exam strategy and attempt planning",
+            "NCERT foundation build-up",
+            "Current affairs system and revision notes",
+            "Revision cycles and productivity system",
+        ],
+    },
+    "prelims_gs": {
+        "label": "Prelims GS",
+        "topics": [
+            "Indian Polity and Constitution",
+            "History of India and freedom struggle",
+            "Indian and world geography",
+            "Indian economy and budgeting",
+            "Environment and ecology",
+            "Science and technology for UPSC",
+            "Prelims PYQ analysis",
+        ],
+    },
+    "csat": {
+        "label": "CSAT",
+        "topics": [
+            "CSAT aptitude and comprehension",
+            "Reasoning and decision making",
+            "Basic numeracy and data interpretation",
+        ],
+    },
+    "essay": {
+        "label": "Essay",
+        "topics": [
+            "Essay writing framework",
+            "Essay brainstorming and outline practice",
+            "Essay introductions, arguments, and conclusions",
+        ],
+    },
+    "gs1": {
+        "label": "GS Paper I",
+        "topics": [
+            "Indian heritage and culture",
+            "Modern Indian history",
+            "World history basics",
+            "Indian society and social issues",
+            "Physical and human geography",
+        ],
+    },
+    "gs2": {
+        "label": "GS Paper II",
+        "topics": [
+            "Governance and social justice",
+            "Indian Polity and Constitution",
+            "Parliament, judiciary, and federalism",
+            "International relations",
+        ],
+    },
+    "gs3": {
+        "label": "GS Paper III",
+        "topics": [
+            "Indian economy and budgeting",
+            "Agriculture and food processing",
+            "Science and technology for UPSC",
+            "Environment and ecology",
+            "Internal security and disaster management",
+        ],
+    },
+    "gs4": {
+        "label": "GS Paper IV (Ethics)",
+        "topics": [
+            "Ethics, integrity and aptitude",
+            "Case study solving for ethics",
+            "Thinkers, examples, and value frameworks",
+        ],
+    },
+    "answer_writing": {
+        "label": "Answer Writing",
+        "topics": [
+            "Answer writing and mains enrichment",
+            "Value-added notes and examples",
+            "Time-bound answer practice",
+        ],
+    },
+    "interview": {
+        "label": "Interview",
+        "topics": [
+            "Interview preparation and DAF based questions",
+            "Current affairs for interview",
+            "Opinion framing and balanced answers",
+            "Communication, posture and confidence",
+        ],
+    },
+}
+
+UPSC_DEFAULT_SUBJECTS_BY_FOCUS = {
+    "full_journey": ["foundation", "prelims_gs", "csat", "essay", "gs1", "gs2", "gs3", "gs4", "answer_writing", "interview"],
+    "prelims": ["foundation", "prelims_gs", "csat"],
+    "mains": ["foundation", "essay", "gs1", "gs2", "gs3", "gs4", "answer_writing"],
+    "interview": ["foundation", "interview"],
 }
 
 OPENTDB_API = "https://opentdb.com/api.php"
@@ -335,6 +437,17 @@ def _safe_get(url, headers=None, params=None):
         response = _request_session().get(url, headers=headers, params=params, timeout=timeout)
         if response.status_code == 200:
             return response.json()
+    except Exception:
+        return None
+    return None
+
+
+def _safe_get_text(url, headers=None, params=None):
+    try:
+        timeout = current_app.config.get("REQUEST_TIMEOUT_SECONDS", 8)
+        response = _request_session().get(url, headers=headers, params=params, timeout=timeout)
+        if response.status_code == 200:
+            return response.text
     except Exception:
         return None
     return None
@@ -726,6 +839,11 @@ def create_roadmap():
         study_days_per_week = max(1, min(7, study_days_per_week))
         upsc_focus = request.form.get('upsc_focus', 'full_journey').strip() or "full_journey"
         upsc_optional_subject = request.form.get('upsc_optional_subject', '').strip()
+        upsc_subjects = request.form.getlist('upsc_subjects')
+        if not upsc_subjects:
+            serialized_subjects = request.form.get('selected_upsc_subjects', '').strip()
+            if serialized_subjects:
+                upsc_subjects = [item.strip() for item in serialized_subjects.split(",") if item.strip()]
         start_date_str = request.form.get('start_date')
         start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else datetime.utcnow().date()
 
@@ -760,7 +878,8 @@ def create_roadmap():
         if confirmed_topics:
             topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
         elif roadmap_type == "upsc":
-            topics, projects = _build_upsc_plan(upsc_optional_subject, upsc_focus)
+            topics, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
+            raw_text = _compose_upsc_source_text(upsc_subjects, upsc_optional_subject, upsc_focus)
             _ensure_upsc_question_bank()
         elif roadmap_type == "career":
             key = _normalize(title)
@@ -794,12 +913,12 @@ def create_roadmap():
         else:
             topics = _extract_topics_from_text(raw_text)
 
-        if (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text and not confirmed_topics:
+        if roadmap_type != "upsc" and (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text and not confirmed_topics:
             ai_topics = _ai_extract_topics(raw_text)
             if ai_topics:
                 topics = ai_topics
 
-        if roadmap_type == "syllabus" and not confirmed_topics:
+        if roadmap_type in {"syllabus", "upsc"} and not confirmed_topics:
             if not topics:
                 flash("Please provide a syllabus text or upload a file with clear topics.")
                 return redirect(url_for('dashboard.create_roadmap'))
@@ -812,6 +931,9 @@ def create_roadmap():
                 study_days_per_week=study_days_per_week,
                 start_date=start_date,
                 raw_text=raw_text,
+                upsc_focus=upsc_focus,
+                upsc_optional_subject=upsc_optional_subject,
+                selected_upsc_subjects=",".join(upsc_subjects),
                 topics="\n".join(topics),
                 original_topics=topics
             )
@@ -1361,38 +1483,83 @@ def delete_roadmap(roadmap_id):
     return redirect(url_for('dashboard.dashboard'))
 
 
-def _build_upsc_plan(optional_subject="", focus="full_journey"):
-    topics = list(UPSC_STAGE_TOPICS.get(focus, UPSC_STAGE_TOPICS["full_journey"]))
-    optional_subject = optional_subject.strip()
+def _resolve_upsc_subjects(focus="full_journey", selected_subjects=None):
+    selected_subjects = selected_subjects or []
+    resolved = [key for key in selected_subjects if key in UPSC_SUBJECT_LIBRARY]
+    if resolved:
+        return resolved
+    return list(UPSC_DEFAULT_SUBJECTS_BY_FOCUS.get(focus, UPSC_DEFAULT_SUBJECTS_BY_FOCUS["full_journey"]))
+
+
+def _download_upsc_portal_snapshot():
+    snippets = []
+    for item in UPSC_RESOURCES[:4]:
+        html = _safe_get_text(item["url"])
+        if not html:
+            continue
+        cleaned = re.sub(r"<[^>]+>", " ", html)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        if cleaned:
+            snippets.append(f"{item['title']}: {cleaned[:700]}")
+    return "\n\n".join(snippets[:3])
+
+
+def _compose_upsc_source_text(selected_subjects, optional_subject, focus):
+    labels = [UPSC_SUBJECT_LIBRARY[key]["label"] for key in selected_subjects if key in UPSC_SUBJECT_LIBRARY]
+    portal_text = _download_upsc_portal_snapshot()
+    lines = [
+        f"UPSC Focus: {focus}",
+        f"Selected Subjects: {', '.join(labels) if labels else 'Default UPSC track'}",
+    ]
+    if optional_subject:
+        lines.append(f"Optional Subject: {optional_subject}")
+    if portal_text:
+        lines.append("Official UPSC portal snapshot:")
+        lines.append(portal_text)
+    return "\n".join(lines)
+
+
+def _build_upsc_subject_plan(selected_subjects, optional_subject="", focus="full_journey"):
+    resolved = _resolve_upsc_subjects(focus, selected_subjects)
+    topics = []
+    for key in resolved:
+        topics.extend(UPSC_SUBJECT_LIBRARY[key]["topics"])
     if optional_subject:
         topics.append(f"Optional subject deep dive: {optional_subject}")
-    else:
-        topics.append("Optional subject selection and starter preparation")
+        topics.append(f"Optional subject PYQ mapping: {optional_subject}")
 
     projects = [
         "Daily current affairs notes and weekly revision",
-        "PYQ drill across prelims and mains",
+        "PYQ drill across selected papers",
         "Answer writing practice with self-review",
         "Mock test analysis and weak-area tracker",
     ]
-    if focus == "interview":
+    if "interview" in resolved and focus == "interview":
         projects = [
             "DAF question bank",
             "Mock interview reflections",
             "Current affairs speaking practice",
         ]
-    return topics, projects
+
+    unique_topics = []
+    seen = set()
+    for topic in topics:
+        key = topic.lower()
+        if key not in seen:
+            seen.add(key)
+            unique_topics.append(topic)
+    return unique_topics, projects, resolved
 
 
 def _upsc_resources_for_task(task_title, optional_subject=""):
     title = _normalize(task_title)
-    picks = list(UPSC_RESOURCES[:3])
+    picks = list(UPSC_RESOURCES[:4])
     if "current affairs" in title:
-        picks.append(UPSC_RESOURCES[3])
-    if "polity" in title or "governance" in title or "constitution" in title:
         picks.append(UPSC_RESOURCES[4])
-    if "ncert" in title or "history" in title or "geography" in title or "science" in title:
+    if "polity" in title or "governance" in title or "constitution" in title:
         picks.append(UPSC_RESOURCES[5])
+    if "ncert" in title or "history" in title or "geography" in title or "science" in title:
+        picks.append(UPSC_RESOURCES[6])
     if optional_subject and "optional subject" in title:
         picks.append({
             "title": f"Optional subject reading plan: {optional_subject}",
