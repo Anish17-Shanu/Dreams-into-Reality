@@ -511,6 +511,36 @@ button:hover,
     background: rgba(11, 16, 38, 0.6);
 }
 
+.topic-review-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.topic-original,
+.topic-edit {
+    background: rgba(11, 16, 38, 0.55);
+    border-radius: 18px;
+    padding: 18px;
+    border: 1px solid var(--border);
+}
+
+.topic-list {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    display: grid;
+    gap: 8px;
+    max-height: 320px;
+    overflow: auto;
+}
+
+.topic-list li {
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
 .diff-list {
     list-style: none;
     padding: 0;

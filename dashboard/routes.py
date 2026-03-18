@@ -730,7 +730,10 @@ def create_roadmap():
             if ai_topics:
                 topics = ai_topics
 
-        if request.form.get("preview_topics") == "on" and not confirmed_topics:
+        if roadmap_type == "syllabus" and not confirmed_topics:
+            if not topics:
+                flash("Please provide a syllabus text or upload a file with clear topics.")
+                return redirect(url_for('dashboard.create_roadmap'))
             return render_template(
                 "roadmap_preview.html",
                 title=title,

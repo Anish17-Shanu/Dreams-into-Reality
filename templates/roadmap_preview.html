@@ -13,15 +13,29 @@
         <input type="hidden" name="study_days_per_week" value="{{ study_days_per_week }}">
         <input type="hidden" name="start_date" value="{{ start_date }}">
         <input type="hidden" name="source_text" value="{{ raw_text }}">
-        <label>
-            Topics (one per line)
-            <textarea name="confirmed_topics" rows="10">{{ topics }}</textarea>
-        </label>
-        <div class="diff-panel" data-original="{{ original_topics | join('||') }}">
-            <h4>Topic edits</h4>
-            <p class="muted">We’ll highlight changes as you edit.</p>
-            <ul class="diff-list"></ul>
+        <div class="topic-review-grid">
+            <div class="topic-original">
+                <h4>Extracted Topics</h4>
+                <p class="muted">These are the raw topics we pulled from your syllabus.</p>
+                <ul class="topic-list">
+                    {% for topic in original_topics %}
+                    <li>{{ topic }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="topic-edit">
+                <label>
+                    Your Topics (edit freely, one per line)
+                    <textarea name="confirmed_topics" rows="12">{{ topics }}</textarea>
+                </label>
+                <div class="diff-panel" data-original="{{ original_topics | join('||') }}">
+                    <h4>Topic edits</h4>
+                    <p class="muted">We'll highlight changes as you edit.</p>
+                    <ul class="diff-list"></ul>
+                </div>
+            </div>
         </div>
+
         <button type="submit">Generate roadmap</button>
     </form>
 </section>
