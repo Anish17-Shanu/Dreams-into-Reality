@@ -632,6 +632,45 @@ button:hover,
     font-size: 0.95rem;
 }
 
+.upsc-bucket-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 18px 0 28px;
+}
+
+.bucket-card {
+    background: rgba(11, 16, 38, 0.65);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+}
+
+.bucket-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.bucket-tests {
+    margin: 12px 0 0;
+}
+
+.bucket-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.test-bucket {
+    display: grid;
+    gap: 12px;
+}
+
 .diff-list {
     list-style: none;
     padding: 0;

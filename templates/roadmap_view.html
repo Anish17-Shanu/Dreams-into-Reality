@@ -56,7 +56,7 @@
         <form method="POST" action="{{ url_for('dashboard.checkin', roadmap_id=roadmap.id) }}" class="quick-checkin">
             <input type="hidden" name="minutes" value="15">
             <input type="hidden" name="note" value="Quick check-in">
-            <button type="submit">Quick 15‑min Win</button>
+            <button type="submit">Quick 15-min Win</button>
         </form>
         <div class="action-links">
             {% if roadmap.roadmap_type == 'upsc' %}
@@ -80,7 +80,34 @@
                 <p class="muted">This roadmap includes built-in PYQ work, revision cycles, answer writing, and mock tests scheduled across your timeline.</p>
             </div>
         </div>
-        <p class="muted">Use Practice Vault for question work and the scheduler below for your automatic mock plan.</p>
+        <p class="muted">Use Practice Vault for question work and track each stage separately below.</p>
+    </div>
+
+    <div class="upsc-bucket-grid">
+        {% for bucket in upsc_buckets %}
+        <article class="bucket-card">
+            <div class="bucket-header">
+                <div>
+                    <h3>{{ bucket.name }}</h3>
+                    <p class="muted">{{ bucket.completed }}/{{ bucket.total }} tasks completed</p>
+                </div>
+                <span class="pill">{{ bucket.progress }}%</span>
+            </div>
+            <div class="progress">
+                <div class="progress-bar" style="width: {{ bucket.progress }}%"></div>
+            </div>
+            <p class="muted bucket-tests">Tests: {{ bucket.test_completed }}/{{ bucket.test_total }} completed</p>
+            {% if bucket.tests %}
+            <div class="bucket-chip-row">
+                {% for test in bucket.tests %}
+                <span class="chip">{{ test.title }}</span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="muted">No scheduled tests in this stage yet.</p>
+            {% endif %}
+        </article>
+        {% endfor %}
     </div>
     {% endif %}
 
@@ -88,7 +115,7 @@
         <div class="panel-header">
             <div>
                 <h2>Mock Test Scheduler</h2>
-                <p class="muted">Plan no‑extra‑load mock tests and track completion.</p>
+                <p class="muted">Plan no-extra-load mock tests and track completion.</p>
             </div>
         </div>
         <form method="POST" action="{{ url_for('dashboard.schedule_test', roadmap_id=roadmap.id) }}" class="inline-form">
@@ -100,10 +127,40 @@
         </form>
         {% if tests %}
             <div class="task-list">
-                {% for test in tests %}
+                {% if roadmap.roadmap_type == 'upsc' %}
+                    {% for bucket in upsc_buckets %}
+                        {% if bucket.tests %}
+                        <section class="test-bucket">
+                            <div class="panel-header">
+                                <div>
+                                    <h3>{{ bucket.name }} Tests</h3>
+                                    <p class="muted">{{ bucket.test_completed }}/{{ bucket.test_total }} finished</p>
+                                </div>
+                            </div>
+                            <div class="task-list">
+                                {% for test in bucket.tests %}
+                                <article class="task-card">
+                                    <h3>{{ test.title }}</h3>
+                                    <p class="muted">Date: {{ test.scheduled_date }} | {{ test.duration_minutes }} min | {{ test.questions_count }} Qs</p>
+                                    <form method="POST" action="{{ url_for('dashboard.update_test_status', roadmap_id=roadmap.id, test_id=test.id) }}" class="inline-form">
+                                        <select name="status">
+                                            <option value="planned" {% if test.status == 'planned' %}selected{% endif %}>Planned</option>
+                                            <option value="completed" {% if test.status == 'completed' %}selected{% endif %}>Completed</option>
+                                            <option value="missed" {% if test.status == 'missed' %}selected{% endif %}>Missed</option>
+                                        </select>
+                                        <button type="submit">Update</button>
+                                    </form>
+                                </article>
+                                {% endfor %}
+                            </div>
+                        </section>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    {% for test in tests %}
                     <article class="task-card">
                         <h3>{{ test.title }}</h3>
-                        <p class="muted">Date: {{ test.scheduled_date }} · {{ test.duration_minutes }} min · {{ test.questions_count }} Qs</p>
+                        <p class="muted">Date: {{ test.scheduled_date }} | {{ test.duration_minutes }} min | {{ test.questions_count }} Qs</p>
                         <form method="POST" action="{{ url_for('dashboard.update_test_status', roadmap_id=roadmap.id, test_id=test.id) }}" class="inline-form">
                             <select name="status">
                                 <option value="planned" {% if test.status == 'planned' %}selected{% endif %}>Planned</option>
@@ -113,7 +170,8 @@
                             <button type="submit">Update</button>
                         </form>
                     </article>
-                {% endfor %}
+                    {% endfor %}
+                {% endif %}
             </div>
         {% else %}
             <p class="muted">No mock tests scheduled yet.</p>

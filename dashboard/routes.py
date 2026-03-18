@@ -1039,6 +1039,7 @@ def view_roadmap(roadmap_id):
             key=lambda r: (-(r.rating_avg + r.score), r.flagged_count)
         )
     tests = MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).order_by(MockTestSchedule.scheduled_date.asc()).all()
+    upsc_buckets = _build_upsc_dashboard_data(tasks, tests) if roadmap.roadmap_type == "upsc" else []
     return render_template(
         'roadmap_view.html',
         roadmap=roadmap,
@@ -1047,7 +1048,8 @@ def view_roadmap(roadmap_id):
         forecast=forecast,
         last_checkin=last_checkin,
         resources_map=resources_map,
-        tests=tests
+        tests=tests,
+        upsc_buckets=upsc_buckets
     )
 
 
@@ -1615,6 +1617,67 @@ def _build_upsc_test_plan(start_date, target_date, focus="full_journey"):
             "questions_count": 100 if "Prelims" in label or "CSAT" in label else 20 if focus == "interview" else 25,
         })
     return tests
+
+
+def _classify_upsc_bucket(title):
+    normalized = _normalize(title)
+    prelims_markers = [
+        "prelims", "csat", "environment", "ecology", "science and technology",
+        "polity", "history", "geography", "economy", "ncert"
+    ]
+    mains_markers = [
+        "essay", "general studies", "gs paper", "ethics", "answer writing",
+        "mains", "governance", "international relations", "internal security", "optional subject"
+    ]
+    interview_markers = [
+        "interview", "daf", "personality test", "panel round", "communication"
+    ]
+
+    if any(marker in normalized for marker in interview_markers):
+        return "Interview"
+    if any(marker in normalized for marker in mains_markers):
+        return "Mains"
+    if any(marker in normalized for marker in prelims_markers):
+        return "Prelims"
+    return "Foundation"
+
+
+def _build_upsc_dashboard_data(tasks, tests):
+    buckets = {
+        "Foundation": {"tasks": [], "tests": [], "completed": 0, "total": 0, "test_completed": 0},
+        "Prelims": {"tasks": [], "tests": [], "completed": 0, "total": 0, "test_completed": 0},
+        "Mains": {"tasks": [], "tests": [], "completed": 0, "total": 0, "test_completed": 0},
+        "Interview": {"tasks": [], "tests": [], "completed": 0, "total": 0, "test_completed": 0},
+    }
+
+    for task in tasks:
+        bucket = _classify_upsc_bucket(task.title)
+        buckets[bucket]["tasks"].append(task)
+        buckets[bucket]["total"] += 1
+        if task.status == "done":
+            buckets[bucket]["completed"] += 1
+
+    for test in tests:
+        bucket = _classify_upsc_bucket(test.title)
+        buckets[bucket]["tests"].append(test)
+        if test.status == "completed":
+            buckets[bucket]["test_completed"] += 1
+
+    ordered = []
+    for name in ["Foundation", "Prelims", "Mains", "Interview"]:
+        bucket = buckets[name]
+        progress = round((bucket["completed"] / bucket["total"]) * 100, 2) if bucket["total"] else 0
+        ordered.append({
+            "name": name,
+            "tasks": bucket["tasks"],
+            "tests": bucket["tests"],
+            "completed": bucket["completed"],
+            "total": bucket["total"],
+            "progress": progress,
+            "test_completed": bucket["test_completed"],
+            "test_total": len(bucket["tests"]),
+        })
+    return ordered
 
 
 @dashboard_bp.route('/uploads/<path:filename>')
