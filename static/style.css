@@ -541,6 +541,76 @@ button:hover,
     background: rgba(255, 255, 255, 0.06);
 }
 
+.topic-builder {
+    display: grid;
+    gap: 12px;
+}
+
+.topic-edit-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 10px;
+}
+
+.topic-edit-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 10px;
+}
+
+.topic-edit-item.drag-over {
+    border-color: rgba(168, 85, 247, 0.7);
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+}
+
+.drag-handle {
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: grab;
+    user-select: none;
+    padding: 4px 6px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.topic-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 0.95rem;
+}
+
+.topic-input:focus {
+    outline: none;
+}
+
+.topic-remove {
+    background: rgba(248, 113, 113, 0.15);
+    border: 1px solid rgba(248, 113, 113, 0.4);
+    color: #fecaca;
+    padding: 4px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.topic-edit-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.topic-textarea textarea {
+    margin-top: 8px;
+}
+
 .diff-list {
     list-style: none;
     padding: 0;

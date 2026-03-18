@@ -24,9 +24,18 @@
                 </ul>
             </div>
             <div class="topic-edit">
-                <label>
-                    Your Topics (edit freely, one per line)
-                    <textarea name="confirmed_topics" rows="12">{{ topics }}</textarea>
+                <h4>Your Topics</h4>
+                <p class="muted">Drag to reorder, edit inline, or add/remove topics.</p>
+                <div class="topic-builder">
+                    <ul class="topic-edit-list" aria-label="Editable topic list"></ul>
+                    <div class="topic-edit-actions">
+                        <button type="button" class="btn-ghost" id="add-topic">Add topic</button>
+                        <button type="button" class="btn-ghost" id="clean-topics">Clean & Trim Topics</button>
+                    </div>
+                </div>
+                <label class="topic-textarea">
+                    Bulk edit (one per line)
+                    <textarea name="confirmed_topics" rows="10">{{ topics }}</textarea>
                 </label>
                 <div class="diff-panel" data-original="{{ original_topics | join('||') }}">
                     <h4>Topic edits</h4>
@@ -72,5 +81,143 @@
     }
     textarea.addEventListener("input", refreshDiff);
     refreshDiff();
+    const editList = document.querySelector(".topic-edit-list");
+    const addBtn = document.getElementById("add-topic");
+    const cleanBtn = document.getElementById("clean-topics");
+    let syncing = false;
+
+    const stopPhrases = [
+        "course objective", "course objectives", "course outcome", "course outcomes",
+        "learning outcome", "learning outcomes", "teaching scheme", "examination scheme",
+        "grading", "evaluation", "assessment", "textbook", "reference book",
+        "credits", "marks", "attendance", "prerequisite", "prerequisites",
+        "instructions", "note:", "notes:", "recommended", "required reading",
+        "syllabus", "syllabi", "course contents", "course content", "list of experiments"
+    ];
+    const noiseWords = new Set(["introduction", "overview", "basics", "fundamentals", "general"]);
+
+    function parseTextarea() {
+        return textarea.value
+            .split("\n")
+            .map(t => t.trim())
+            .filter(Boolean);
+    }
+
+    function cleanTopics(topics) {
+        const seen = new Set();
+        const cleaned = [];
+        topics.forEach(topic => {
+            let t = topic.replace(/\s+/g, " ").trim();
+            if (!t) return;
+            const lower = t.toLowerCase();
+            if (stopPhrases.some(p => lower.includes(p))) return;
+            if (!/[A-Za-z]/.test(t)) return;
+            const words = t.split(" ");
+            if (words.length > 10) return;
+            if (words.length === 1) {
+                if (t.length < 5 || noiseWords.has(lower)) return;
+            }
+            if (t.length > 90) return;
+            if (seen.has(lower)) return;
+            seen.add(lower);
+            cleaned.push(t);
+        });
+        return cleaned.slice(0, 80);
+    }
+
+    function syncTextareaFromList() {
+        if (syncing) return;
+        syncing = true;
+        const topics = Array.from(editList.querySelectorAll(".topic-input"))
+            .map(input => input.value.trim())
+            .filter(Boolean);
+        textarea.value = topics.join("\n");
+        refreshDiff();
+        syncing = false;
+    }
+
+    function renderList(topics) {
+        editList.innerHTML = "";
+        const list = topics.length ? topics : [""];
+        list.forEach((topic, index) => {
+            const li = document.createElement("li");
+            li.className = "topic-edit-item";
+            li.draggable = true;
+            li.dataset.index = index;
+
+            const handle = document.createElement("span");
+            handle.className = "drag-handle";
+            handle.textContent = "drag";
+
+            const input = document.createElement("input");
+            input.type = "text";
+            input.value = topic;
+            input.className = "topic-input";
+            input.addEventListener("input", syncTextareaFromList);
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className = "topic-remove";
+            removeBtn.textContent = "Remove";
+            removeBtn.addEventListener("click", () => {
+                li.remove();
+                syncTextareaFromList();
+            });
+
+            li.addEventListener("dragstart", (event) => {
+                event.dataTransfer.setData("text/plain", li.dataset.index);
+            });
+            li.addEventListener("dragover", (event) => {
+                event.preventDefault();
+                li.classList.add("drag-over");
+            });
+            li.addEventListener("dragleave", () => {
+                li.classList.remove("drag-over");
+            });
+            li.addEventListener("drop", (event) => {
+                event.preventDefault();
+                li.classList.remove("drag-over");
+                const fromIndex = parseInt(event.dataTransfer.getData("text/plain"), 10);
+                const toIndex = parseInt(li.dataset.index, 10);
+                if (Number.isNaN(fromIndex) || Number.isNaN(toIndex) || fromIndex === toIndex) return;
+                const current = Array.from(editList.querySelectorAll(".topic-input"))
+                    .map(input => input.value.trim());
+                const moved = current.splice(fromIndex, 1)[0];
+                current.splice(toIndex, 0, moved);
+                renderList(current);
+                syncTextareaFromList();
+            });
+
+            li.appendChild(handle);
+            li.appendChild(input);
+            li.appendChild(removeBtn);
+            editList.appendChild(li);
+        });
+    }
+
+    textarea.addEventListener("input", () => {
+        if (syncing) return;
+        const topics = parseTextarea();
+        renderList(topics);
+        refreshDiff();
+    });
+
+    addBtn?.addEventListener("click", () => {
+        const topics = parseTextarea();
+        topics.push("");
+        renderList(topics);
+        const inputs = editList.querySelectorAll(".topic-input");
+        if (inputs.length) {
+            inputs[inputs.length - 1].focus();
+        }
+    });
+
+    cleanBtn?.addEventListener("click", () => {
+        const topics = cleanTopics(parseTextarea());
+        renderList(topics);
+        syncTextareaFromList();
+    });
+
+    renderList(parseTextarea());
 </script>
 {% endblock %}
