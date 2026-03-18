@@ -671,6 +671,55 @@ button:hover,
     gap: 12px;
 }
 
+.upsc-hero {
+    background:
+        linear-gradient(135deg, rgba(10, 18, 34, 0.92), rgba(21, 35, 58, 0.88)),
+        radial-gradient(circle at top right, rgba(189, 161, 84, 0.18), transparent 35%);
+    border: 1px solid rgba(201, 179, 110, 0.24);
+}
+
+.upsc-pill {
+    background: rgba(201, 179, 110, 0.18);
+    border: 1px solid rgba(201, 179, 110, 0.35);
+    color: #f4e7b2;
+}
+
+.upsc-kicker-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+    color: #d4d8df;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+}
+
+.upsc-kicker-row span {
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(201, 179, 110, 0.28);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.upsc-brief {
+    background: rgba(8, 14, 27, 0.72);
+    border: 1px solid rgba(201, 179, 110, 0.2);
+    animation: none;
+}
+
+.upsc-chip {
+    background: rgba(201, 179, 110, 0.14);
+    border-color: rgba(201, 179, 110, 0.3);
+    color: #f3e8c1;
+}
+
+.upsc-panel {
+    background:
+        linear-gradient(180deg, rgba(8, 14, 27, 0.92), rgba(16, 23, 36, 0.9));
+    border: 1px solid rgba(201, 179, 110, 0.18);
+}
+
 .diff-list {
     list-style: none;
     padding: 0;

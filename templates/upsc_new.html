@@ -1,24 +1,29 @@
 {% extends 'base.html' %}
 {% block content %}
-<section class="hero hero-wide">
+<section class="hero hero-wide upsc-hero">
     <div>
-        <span class="pill">UPSC Mission</span>
+        <span class="pill upsc-pill">UPSC Mission</span>
         <h1>Build a serious UPSC prep system.</h1>
         <p class="muted">Choose your stage, pick the papers to focus on, and get a dedicated UPSC workflow with official resources, PYQ work, revision blocks, and auto-scheduled tests.</p>
+        <div class="upsc-kicker-row">
+            <span>Focused</span>
+            <span>Structured</span>
+            <span>Official-source aware</span>
+        </div>
     </div>
-    <div class="hero-card">
+    <div class="hero-card upsc-brief">
         <h3>Included automatically</h3>
         <div class="chip-row">
-            <span class="chip">Official syllabus links</span>
-            <span class="chip">PYQ tracking</span>
-            <span class="chip">Mock tests</span>
-            <span class="chip">Stage progress</span>
+            <span class="chip upsc-chip">Official syllabus links</span>
+            <span class="chip upsc-chip">PYQ tracking</span>
+            <span class="chip upsc-chip">Mock tests</span>
+            <span class="chip upsc-chip">Stage progress</span>
         </div>
         <p class="muted">This page is separate from the standard syllabus and career creator so the main flow stays clean for everyone else.</p>
     </div>
 </section>
 
-<section class="panel">
+<section class="panel upsc-panel">
     <form method="POST" class="stack">
         <label>
             Mission title
