@@ -27,6 +27,7 @@
             {% if session.get('user_id') %}
                 <a href="{{ url_for('dashboard.dashboard') }}">Dreamboard</a>
                 <a href="{{ url_for('dashboard.create_roadmap') }}">New Mission</a>
+                <a href="{{ url_for('dashboard.create_upsc_roadmap') }}">UPSC Mission</a>
                 <button type="button" class="ghost calm-toggle" aria-pressed="false">Calm Mode</button>
                 <a href="{{ url_for('auth.logout') }}" class="nav-cta">Logout</a>
             {% else %}

@@ -3,9 +3,12 @@
 <section class="hero">
     <div>
         <h1>Welcome back, {{ user.email }}</h1>
-        <p class="muted">Your dreams left you a note: “Let’s do this today.”</p>
+        <p class="muted">Your dreams left you a note: "Let's do this today."</p>
     </div>
-    <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Launch a Dream</a>
+    <div class="hero-actions">
+        <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Launch a Dream</a>
+        <a class="ghost" href="{{ url_for('dashboard.create_upsc_roadmap') }}">UPSC Mission</a>
+    </div>
 </section>
 
 <section class="grid">
@@ -35,8 +38,11 @@
     {% else %}
         <div class="empty-state">
             <h3>No roadmaps yet</h3>
-            <p class="muted">Add a syllabus or career dream and we’ll turn it into a plan.</p>
-            <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Create your first mission</a>
+            <p class="muted">Add a syllabus or career dream and we will turn it into a plan.</p>
+            <div class="hero-actions">
+                <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Create your first mission</a>
+                <a class="ghost" href="{{ url_for('dashboard.create_upsc_roadmap') }}">Build UPSC Mission</a>
+            </div>
         </div>
     {% endif %}
 </section>

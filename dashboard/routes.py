@@ -829,7 +829,7 @@ def create_roadmap():
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
         roadmap_type = request.form.get('roadmap_type', 'syllabus')
-        if roadmap_type not in {"syllabus", "career", "upsc"}:
+        if roadmap_type not in {"syllabus", "career"}:
             roadmap_type = "syllabus"
         timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
         timeline_weeks = max(0, min(52, timeline_weeks))
@@ -837,13 +837,6 @@ def create_roadmap():
         hours_per_week = max(1, min(40, hours_per_week))
         study_days_per_week = int(request.form.get('study_days_per_week', 5))
         study_days_per_week = max(1, min(7, study_days_per_week))
-        upsc_focus = request.form.get('upsc_focus', 'full_journey').strip() or "full_journey"
-        upsc_optional_subject = request.form.get('upsc_optional_subject', '').strip()
-        upsc_subjects = request.form.getlist('upsc_subjects')
-        if not upsc_subjects:
-            serialized_subjects = request.form.get('selected_upsc_subjects', '').strip()
-            if serialized_subjects:
-                upsc_subjects = [item.strip() for item in serialized_subjects.split(",") if item.strip()]
         start_date_str = request.form.get('start_date')
         start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else datetime.utcnow().date()
 
@@ -877,10 +870,6 @@ def create_roadmap():
         use_ai = request.form.get('use_ai') == 'on'
         if confirmed_topics:
             topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
-        elif roadmap_type == "upsc":
-            topics, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
-            raw_text = _compose_upsc_source_text(upsc_subjects, upsc_optional_subject, upsc_focus)
-            _ensure_upsc_question_bank()
         elif roadmap_type == "career":
             key = _normalize(title)
             match = None
@@ -918,7 +907,7 @@ def create_roadmap():
             if ai_topics:
                 topics = ai_topics
 
-        if roadmap_type in {"syllabus", "upsc"} and not confirmed_topics:
+        if roadmap_type == "syllabus" and not confirmed_topics:
             if not topics:
                 flash("Please provide a syllabus text or upload a file with clear topics.")
                 return redirect(url_for('dashboard.create_roadmap'))
@@ -931,6 +920,75 @@ def create_roadmap():
                 study_days_per_week=study_days_per_week,
                 start_date=start_date,
                 raw_text=raw_text,
+                topics="\n".join(topics),
+                original_topics=topics
+            )
+
+        if not title:
+            title = "Dream Roadmap"
+        if not topics and roadmap_type == "syllabus":
+            flash("Please provide a syllabus text or upload a file with topics.")
+            return redirect(url_for('dashboard.create_roadmap'))
+
+        roadmap, task_ids, auto_fetch, _ = _persist_roadmap(
+            roadmap_type, title, raw_text, topics, projects, start_date, timeline_weeks,
+            hours_per_week, study_days_per_week
+        )
+        if auto_fetch:
+            thread = threading.Thread(
+                target=_background_fetch_resources,
+                args=(current_app._get_current_object(), roadmap.id),
+                daemon=True
+            )
+            thread.start()
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+    return render_template('roadmap_new.html')
+
+
+@dashboard_bp.route('/upsc/new', methods=['GET', 'POST'])
+@login_required
+def create_upsc_roadmap():
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip() or "UPSC Mission"
+        timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
+        timeline_weeks = max(0, min(52, timeline_weeks))
+        hours_per_week = int(request.form.get('hours_per_week', 6))
+        hours_per_week = max(1, min(40, hours_per_week))
+        study_days_per_week = int(request.form.get('study_days_per_week', 5))
+        study_days_per_week = max(1, min(7, study_days_per_week))
+        upsc_focus = request.form.get('upsc_focus', 'full_journey').strip() or "full_journey"
+        upsc_optional_subject = request.form.get('upsc_optional_subject', '').strip()
+        upsc_subjects = request.form.getlist('upsc_subjects')
+        if not upsc_subjects:
+            serialized_subjects = request.form.get('selected_upsc_subjects', '').strip()
+            if serialized_subjects:
+                upsc_subjects = [item.strip() for item in serialized_subjects.split(",") if item.strip()]
+        start_date_str = request.form.get('start_date')
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else datetime.utcnow().date()
+        raw_text = request.form.get('source_text', '').strip()
+        confirmed_topics = request.form.get('confirmed_topics', '').strip()
+        _, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
+
+        if confirmed_topics:
+            topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
+            if not raw_text:
+                raw_text = _compose_upsc_source_text(upsc_subjects, upsc_optional_subject, upsc_focus)
+        else:
+            topics, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
+            raw_text = _compose_upsc_source_text(upsc_subjects, upsc_optional_subject, upsc_focus)
+            _ensure_upsc_question_bank()
+
+        if not confirmed_topics:
+            return render_template(
+                "roadmap_preview.html",
+                title=title,
+                roadmap_type="upsc",
+                timeline_weeks=timeline_weeks,
+                hours_per_week=hours_per_week,
+                study_days_per_week=study_days_per_week,
+                start_date=start_date,
+                raw_text=raw_text,
                 upsc_focus=upsc_focus,
                 upsc_optional_subject=upsc_optional_subject,
                 selected_upsc_subjects=",".join(upsc_subjects),
@@ -938,58 +996,12 @@ def create_roadmap():
                 original_topics=topics
             )
 
-        if not title:
-            if roadmap_type == "upsc":
-                title = "UPSC Mission"
-            else:
-                title = "Dream Roadmap"
-        if not topics and roadmap_type == "syllabus":
-            flash("Please provide a syllabus text or upload a file with topics.")
-            return redirect(url_for('dashboard.create_roadmap'))
-
-        task_specs, total_hours, computed_end = _build_tasks(
-            roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week
+        roadmap, task_ids, auto_fetch, target_date = _persist_roadmap(
+            "upsc", title, raw_text, topics, projects, start_date, timeline_weeks,
+            hours_per_week, study_days_per_week, upsc_focus, upsc_optional_subject
         )
-        target_date = computed_end
 
-        roadmap = Roadmap(
-            title=title,
-            roadmap_type=roadmap_type,
-            source_text=(raw_text or f"UPSC Focus: {upsc_focus}\nOptional Subject: {upsc_optional_subject}")[:5000],
-            start_date=start_date,
-            target_date=target_date,
-            total_tasks=len(task_specs),
-            completed_tasks=0,
-            total_hours_est=total_hours,
-            hours_per_week=hours_per_week,
-            study_days_per_week=study_days_per_week,
-            timezone=current_app.config.get("DEFAULT_TIMEZONE", "Asia/Kolkata"),
-            resource_fetch_status="idle",
-            user_id=session['user_id']
-        )
-        db.session.add(roadmap)
-        db.session.flush()
-
-        auto_fetch = current_app.config.get("AUTO_FETCH_RESOURCES_ON_CREATE", False)
-        task_ids = []
-        for spec in task_specs:
-            task = Task(
-                title=spec["title"],
-                order_index=spec["order_index"],
-                due_date=spec["due_date"],
-                difficulty=spec["difficulty"],
-                estimated_hours=spec["estimated_hours"],
-                roadmap_id=roadmap.id
-            )
-            db.session.add(task)
-            db.session.flush()
-            task_ids.append(task.id)
-
-            if auto_fetch:
-                task.last_resource_refresh = None
-
-        db.session.commit()
-        if roadmap_type == "upsc" and task_ids:
+        if task_ids:
             upsc_tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
             for task in upsc_tasks:
                 for res in _upsc_resources_for_task(task.title, upsc_optional_subject):
@@ -1010,6 +1022,7 @@ def create_roadmap():
                     roadmap_id=roadmap.id
                 ))
             db.session.commit()
+
         if auto_fetch:
             thread = threading.Thread(
                 target=_background_fetch_resources,
@@ -1019,7 +1032,7 @@ def create_roadmap():
             thread.start()
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
-    return render_template('roadmap_new.html')
+    return render_template('upsc_new.html')
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>')
@@ -1678,6 +1691,53 @@ def _build_upsc_dashboard_data(tasks, tests):
             "test_total": len(bucket["tests"]),
         })
     return ordered
+
+
+def _persist_roadmap(roadmap_type, title, raw_text, topics, projects, start_date, timeline_weeks,
+                     hours_per_week, study_days_per_week, upsc_focus="", upsc_optional_subject=""):
+    task_specs, total_hours, computed_end = _build_tasks(
+        roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week
+    )
+    target_date = computed_end
+
+    roadmap = Roadmap(
+        title=title,
+        roadmap_type=roadmap_type,
+        source_text=(raw_text or f"UPSC Focus: {upsc_focus}\nOptional Subject: {upsc_optional_subject}")[:5000],
+        start_date=start_date,
+        target_date=target_date,
+        total_tasks=len(task_specs),
+        completed_tasks=0,
+        total_hours_est=total_hours,
+        hours_per_week=hours_per_week,
+        study_days_per_week=study_days_per_week,
+        timezone=current_app.config.get("DEFAULT_TIMEZONE", "Asia/Kolkata"),
+        resource_fetch_status="idle",
+        user_id=session['user_id']
+    )
+    db.session.add(roadmap)
+    db.session.flush()
+
+    auto_fetch = current_app.config.get("AUTO_FETCH_RESOURCES_ON_CREATE", False)
+    task_ids = []
+    for spec in task_specs:
+        task = Task(
+            title=spec["title"],
+            order_index=spec["order_index"],
+            due_date=spec["due_date"],
+            difficulty=spec["difficulty"],
+            estimated_hours=spec["estimated_hours"],
+            roadmap_id=roadmap.id
+        )
+        db.session.add(task)
+        db.session.flush()
+        task_ids.append(task.id)
+
+        if auto_fetch:
+            task.last_resource_refresh = None
+
+    db.session.commit()
+    return roadmap, task_ids, auto_fetch, target_date
 
 
 @dashboard_bp.route('/uploads/<path:filename>')

@@ -12,10 +12,9 @@
         </label>
         <label>
             Roadmap type
-            <select name="roadmap_type" id="roadmap-type">
+            <select name="roadmap_type">
                 <option value="syllabus">Syllabus</option>
                 <option value="career">Career</option>
-                <option value="upsc">UPSC</option>
             </select>
         </label>
         <label>
@@ -39,43 +38,12 @@
         </label>
         <label>
             Paste your syllabus or outline
-            <textarea id="source-text" name="source_text" rows="6" placeholder="Paste topics here, one per line."></textarea>
+            <textarea name="source_text" rows="6" placeholder="Paste topics here, one per line."></textarea>
         </label>
-        <label id="upload-wrapper">
+        <label>
             Upload a syllabus file (PDF/TXT/DOCX/Image)
             <input type="file" name="syllabus_file" accept=".pdf,.txt,.docx,.png,.jpg,.jpeg,.bmp,.tiff">
         </label>
-        <div id="upsc-fields" class="stack" hidden>
-            <label>
-                UPSC focus
-                <select name="upsc_focus">
-                    <option value="full_journey">Full Journey</option>
-                    <option value="prelims">Prelims Focus</option>
-                    <option value="mains">Mains Focus</option>
-                    <option value="interview">Interview Focus</option>
-                </select>
-            </label>
-            <label>
-                Optional subject
-                <input type="text" name="upsc_optional_subject" placeholder="e.g. Sociology, Anthropology, PSIR">
-            </label>
-            <fieldset class="subject-picker">
-                <legend>Select subjects to include</legend>
-                <div class="subject-grid">
-                    <label><input type="checkbox" name="upsc_subjects" value="foundation" checked> Foundation and Strategy</label>
-                    <label><input type="checkbox" name="upsc_subjects" value="prelims_gs" checked> Prelims GS</label>
-                    <label><input type="checkbox" name="upsc_subjects" value="csat" checked> CSAT</label>
-                    <label><input type="checkbox" name="upsc_subjects" value="essay" checked> Essay</label>
-                    <label><input type="checkbox" name="upsc_subjects" value="gs1" checked> GS Paper I</label>
-                    <label><input type="checkbox" name="upsc_subjects" value="gs2" checked> GS Paper II</label>
-                    <label><input type="checkbox" name="upsc_subjects" value="gs3" checked> GS Paper III</label>
-                    <label><input type="checkbox" name="upsc_subjects" value="gs4" checked> GS Paper IV</label>
-                    <label><input type="checkbox" name="upsc_subjects" value="answer_writing" checked> Answer Writing</label>
-                    <label><input type="checkbox" name="upsc_subjects" value="interview"> Interview</label>
-                </div>
-            </fieldset>
-            <p class="muted">We will automatically add strategy, PYQ practice, answer writing, mock tests, revision cycles, and official UPSC resources.</p>
-        </div>
         <label class="inline-check">
             <input type="checkbox" name="use_ai">
             Use AI to tidy messy syllabi
@@ -83,27 +51,4 @@
         <button type="submit">Generate roadmap</button>
     </form>
 </section>
-<script>
-    const roadmapType = document.getElementById("roadmap-type");
-    const upscFields = document.getElementById("upsc-fields");
-    const uploadWrapper = document.getElementById("upload-wrapper");
-    const sourceText = document.getElementById("source-text");
-
-    function refreshRoadmapForm() {
-        const current = roadmapType.value;
-        const isUpsc = current === "upsc";
-        const isSyllabus = current === "syllabus";
-
-        upscFields.hidden = !isUpsc;
-        uploadWrapper.hidden = isUpsc;
-        sourceText.placeholder = isUpsc
-            ? "Optional: paste your weak areas, previous scores, or custom notes."
-            : isSyllabus
-                ? "Paste topics here, one per line."
-                : "Paste your career goal, skills to learn, or current outline.";
-    }
-
-    roadmapType.addEventListener("change", refreshRoadmapForm);
-    refreshRoadmapForm();
-</script>
 {% endblock %}

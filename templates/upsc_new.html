@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero hero-wide">
+    <div>
+        <span class="pill">UPSC Mission</span>
+        <h1>Build a serious UPSC prep system.</h1>
+        <p class="muted">Choose your stage, pick the papers to focus on, and get a dedicated UPSC workflow with official resources, PYQ work, revision blocks, and auto-scheduled tests.</p>
+    </div>
+    <div class="hero-card">
+        <h3>Included automatically</h3>
+        <div class="chip-row">
+            <span class="chip">Official syllabus links</span>
+            <span class="chip">PYQ tracking</span>
+            <span class="chip">Mock tests</span>
+            <span class="chip">Stage progress</span>
+        </div>
+        <p class="muted">This page is separate from the standard syllabus and career creator so the main flow stays clean for everyone else.</p>
+    </div>
+</section>
+
+<section class="panel">
+    <form method="POST" class="stack">
+        <label>
+            Mission title
+            <input type="text" name="title" placeholder="e.g. UPSC CSE 2027 Mission">
+        </label>
+        <label>
+            UPSC focus
+            <select name="upsc_focus">
+                <option value="full_journey">Full Journey</option>
+                <option value="prelims">Prelims Focus</option>
+                <option value="mains">Mains Focus</option>
+                <option value="interview">Interview Focus</option>
+            </select>
+        </label>
+        <div class="inline-fields">
+            <label>
+                Timeline (weeks, optional)
+                <input type="number" name="timeline_weeks" min="0" max="52" value="0">
+            </label>
+            <label>
+                Start date
+                <input type="date" name="start_date">
+            </label>
+        </div>
+        <div class="inline-fields">
+            <label>
+                Study hours per week
+                <input type="number" name="hours_per_week" min="1" max="40" value="20">
+            </label>
+            <label>
+                Study days per week
+                <input type="number" name="study_days_per_week" min="1" max="7" value="6">
+            </label>
+        </div>
+        <label>
+            Optional subject
+            <input type="text" name="upsc_optional_subject" placeholder="e.g. Sociology, Anthropology, PSIR">
+        </label>
+        <fieldset class="subject-picker">
+            <legend>Select sections to include</legend>
+            <div class="subject-grid">
+                <label><input type="checkbox" name="upsc_subjects" value="foundation" checked> Foundation and Strategy</label>
+                <label><input type="checkbox" name="upsc_subjects" value="prelims_gs" checked> Prelims GS</label>
+                <label><input type="checkbox" name="upsc_subjects" value="csat" checked> CSAT</label>
+                <label><input type="checkbox" name="upsc_subjects" value="essay" checked> Essay</label>
+                <label><input type="checkbox" name="upsc_subjects" value="gs1" checked> GS Paper I</label>
+                <label><input type="checkbox" name="upsc_subjects" value="gs2" checked> GS Paper II</label>
+                <label><input type="checkbox" name="upsc_subjects" value="gs3" checked> GS Paper III</label>
+                <label><input type="checkbox" name="upsc_subjects" value="gs4" checked> GS Paper IV</label>
+                <label><input type="checkbox" name="upsc_subjects" value="answer_writing" checked> Answer Writing</label>
+                <label><input type="checkbox" name="upsc_subjects" value="interview"> Interview</label>
+            </div>
+        </fieldset>
+        <label>
+            Notes for personalization
+            <textarea name="source_text" rows="5" placeholder="Optional: mention weak areas, attempt year, or your current progress."></textarea>
+        </label>
+        <button type="submit">Generate UPSC Mission</button>
+    </form>
+</section>
+{% endblock %}
