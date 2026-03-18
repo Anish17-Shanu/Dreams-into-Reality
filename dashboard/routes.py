@@ -139,65 +139,87 @@ def _extract_topics_rulebased(text):
     if not text:
         return []
     candidates = []
-    lines = [l.strip() for l in text.splitlines()]
-    lines = [l for l in lines if l]
+    lines = [l.strip() for l in text.splitlines() if l and l.strip()]
 
-    heading_patterns = [
-        r"^(unit|module|chapter|week|topic)\s*\d+[:\.-]?\s*(.*)$",
-        r"^\d+[\.\)]\s*(.*)$",
-        r"^[A-Za-z]\)\s*(.*)$",
-        r"^[-•\*]\s*(.*)$",
+    stop_phrases = [
+        "course objective", "course objectives", "course outcome", "course outcomes",
+        "learning outcome", "learning outcomes", "teaching scheme", "examination scheme",
+        "grading", "evaluation", "assessment", "textbook", "reference book",
+        "credits", "marks", "attendance", "prerequisite", "prerequisites",
+        "instructions", "note:", "notes:", "recommended", "required reading",
+        "syllabus", "syllabi", "course contents", "course content", "list of experiments",
     ]
+    noise_words = {"introduction", "overview", "basics", "fundamentals", "general"}
+
+    def _is_noise(line_lower):
+        return any(phrase in line_lower for phrase in stop_phrases)
+
+    def _clean_heading(raw):
+        cleaned = raw.strip(" \t-*")
+        cleaned = re.sub(
+            r"^(unit|module|chapter|week|topic|section|part)\s*\d+[a-zA-Z]*[:\).\-\s]*",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(r"^\(?[0-9ivxlcdm]+[\)\.\-:]*\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"^[A-Za-z][\)\.\-:]\s*", "", cleaned)
+        return cleaned.strip()
+
+    def _push_candidate(item):
+        if not item:
+            return
+        normalized = re.sub(r"\s+", " ", item).strip(" ,;:-")
+        if not normalized:
+            return
+        if not any(ch.isalpha() for ch in normalized):
+            return
+        words = normalized.split()
+        if len(words) > 10:
+            return
+        if len(words) == 1:
+            if len(normalized) < 5 or normalized.lower() in noise_words:
+                return
+        elif len(words) < 2:
+            return
+        if len(normalized) > 90:
+            return
+        candidates.append(normalized)
 
     for line in lines:
-        cleaned = line.strip(" \t-•*")
-        matched = False
-        for pat in heading_patterns:
-            m = re.match(pat, cleaned, re.IGNORECASE)
-            if m:
-                topic = m.group(2) if m.lastindex and m.lastindex >= 2 else m.group(1)
-                if topic:
-                    candidates.append(topic.strip())
-                matched = True
-                break
-        if matched:
+        line_lower = line.lower()
+        if _is_noise(line_lower):
             continue
 
-        if ":" in cleaned and len(cleaned.split(":")[0].split()) <= 3:
-            parts = cleaned.split(":", 1)
-            if len(parts) == 2:
-                left = parts[0].strip()
-                right = parts[1].strip()
-                if right:
-                    candidates.append(right)
-                elif left:
-                    candidates.append(left)
+        cleaned = _clean_heading(line)
+
+        if ":" in cleaned and len(cleaned.split(":", 1)[0].split()) <= 3:
+            right = cleaned.split(":", 1)[1].strip()
+            _push_candidate(right)
             continue
 
-        if len(cleaned.split()) <= 8 and any(ch.isalpha() for ch in cleaned):
-            candidates.append(cleaned)
+        if len(cleaned) <= 140 and (";" in cleaned or "," in cleaned):
+            parts = re.split(r"[;,]", cleaned)
+            for part in parts:
+                _push_candidate(_clean_heading(part))
+            continue
 
-    expanded = []
-    for item in candidates:
-        if "," in item and len(item) < 120:
-            parts = [p.strip() for p in item.split(",") if p.strip()]
-            if len(parts) > 1:
-                expanded.extend(parts)
-            else:
-                expanded.append(item)
-        else:
-            expanded.append(item)
+        if " - " in cleaned:
+            left, right = [p.strip() for p in cleaned.split(" - ", 1)]
+            _push_candidate(right or left)
+            continue
+
+        _push_candidate(cleaned)
 
     unique = []
     seen = set()
-    for item in expanded:
-        normalized = re.sub(r"\s+", " ", item).strip()
-        if 2 <= len(normalized) <= 80:
-            key = normalized.lower()
-            if key not in seen:
-                seen.add(key)
-                unique.append(normalized)
+    for item in candidates:
+        key = item.lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
     return unique[:80]
+
 
 
 def _extract_text_from_pdf(file_path):
@@ -1249,7 +1271,7 @@ def delete_roadmap(roadmap_id):
     roadmap = Roadmap.query.get_or_404(roadmap_id)
     if roadmap.user_id != session['user_id']:
         return redirect(url_for('dashboard.dashboard'))
-    db.session.delete(roadmap)
+    db.session.query(Roadmap).filter_by(id=roadmap_id).delete(synchronize_session=False)
     db.session.commit()
     return redirect(url_for('dashboard.dashboard'))
 

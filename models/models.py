@@ -5,7 +5,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(256), nullable=False)
-    roadmaps = db.relationship('Roadmap', backref='user', lazy=True)
+    roadmaps = db.relationship('Roadmap', backref='user', lazy=True, passive_deletes=True)
 
 
 class Roadmap(db.Model):
@@ -29,8 +29,8 @@ class Roadmap(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    tasks = db.relationship('Task', backref='roadmap', lazy=True, cascade="all, delete-orphan")
-    checkins = db.relationship('Checkin', backref='roadmap', lazy=True, cascade="all, delete-orphan")
+    tasks = db.relationship('Task', backref='roadmap', lazy=True, cascade="all, delete-orphan", passive_deletes=True)
+    checkins = db.relationship('Checkin', backref='roadmap', lazy=True, cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Task(db.Model):
@@ -50,7 +50,7 @@ class Task(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     roadmap_id = db.Column(db.Integer, db.ForeignKey('roadmap.id'), nullable=False)
-    resources = db.relationship('Resource', backref='task', lazy=True, cascade="all, delete-orphan")
+    resources = db.relationship('Resource', backref='task', lazy=True, cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Resource(db.Model):
@@ -64,7 +64,7 @@ class Resource(db.Model):
     rating_count = db.Column(db.Integer, default=0)
     flagged_count = db.Column(db.Integer, default=0)
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
-    feedback = db.relationship('ResourceFeedback', backref='resource', lazy=True, cascade="all, delete-orphan")
+    feedback = db.relationship('ResourceFeedback', backref='resource', lazy=True, cascade="all, delete-orphan", passive_deletes=True)
 
 
 class ResourceFeedback(db.Model):
