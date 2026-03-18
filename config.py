@@ -9,7 +9,8 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads"))
-    MAX_CONTENT_LENGTH = 8 * 1024 * 1024
+    MAX_CONTENT_LENGTH_MB = int(os.getenv("MAX_CONTENT_LENGTH_MB", "20"))
+    MAX_CONTENT_LENGTH = MAX_CONTENT_LENGTH_MB * 1024 * 1024
     ENABLE_EXTERNAL_RESOURCES = os.getenv("ENABLE_EXTERNAL_RESOURCES", "true").lower() == "true"
     WIKIPEDIA_USER_AGENT = os.getenv("WIKIPEDIA_USER_AGENT", "DreamsIntoReality/1.0 (contact@example.com)")
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
