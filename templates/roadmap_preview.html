@@ -12,7 +12,7 @@
         <input type="hidden" name="hours_per_week" value="{{ hours_per_week }}">
         <input type="hidden" name="study_days_per_week" value="{{ study_days_per_week }}">
         <input type="hidden" name="start_date" value="{{ start_date }}">
-        <input type="hidden" name="source_text" value="{{ raw_text }}">
+        <textarea name="source_text" hidden>{{ raw_text }}</textarea>
         <div class="topic-review-grid">
             <div class="topic-original">
                 <h4>Extracted Topics</h4>
