@@ -98,6 +98,9 @@ UPSC_RESOURCES = [
     {"title": "UPSC Examination Calendar", "url": "https://upsc.gov.in/examinations/exam-calendar", "provider": "upsc"},
     {"title": "UPSC Previous Question Papers", "url": "https://upsc.gov.in/examinations/previous-question-papers", "provider": "upsc"},
     {"title": "UPSC Revised Syllabus & Scheme", "url": "https://upsc.gov.in/examinations/revised-syllabus-scheme", "provider": "upsc"},
+    {"title": "Press Information Bureau", "url": "https://pib.gov.in", "provider": "official"},
+    {"title": "PRS Legislative Research", "url": "https://prsindia.org", "provider": "research"},
+    {"title": "NCERT Textbooks Portal", "url": "https://ncert.nic.in/textbook.php", "provider": "ncert"},
 ]
 
 UPSC_EXAMS = [
@@ -112,6 +115,65 @@ UPSC_EXAMS = [
     "Combined Medical Services",
     "Geo-Scientist"
 ]
+
+UPSC_STAGE_TOPICS = {
+    "full_journey": [
+        "UPSC exam strategy and attempt planning",
+        "NCERT foundation build-up",
+        "Current affairs system and revision notes",
+        "Indian Polity and Constitution",
+        "History of India and freedom struggle",
+        "Indian and world geography",
+        "Indian economy and budgeting",
+        "Environment and ecology",
+        "Science and technology for UPSC",
+        "Internal security and disaster management",
+        "International relations",
+        "Governance and social justice",
+        "Ethics, integrity and aptitude",
+        "Essay writing framework",
+        "CSAT aptitude and comprehension",
+        "Optional subject strategy",
+        "Answer writing and mains enrichment",
+        "Prelims PYQ analysis",
+        "Mains PYQ analysis",
+        "Revision cycles and full-length mocks",
+        "Interview preparation and DAF based questions",
+    ],
+    "prelims": [
+        "NCERT foundation build-up",
+        "Current affairs system and revision notes",
+        "Indian Polity and Constitution",
+        "History of India and freedom struggle",
+        "Indian and world geography",
+        "Indian economy and budgeting",
+        "Environment and ecology",
+        "Science and technology for UPSC",
+        "CSAT aptitude and comprehension",
+        "Prelims PYQ analysis",
+        "Sectional prelims tests",
+        "Full-length prelims mocks and revision",
+    ],
+    "mains": [
+        "Current affairs to mains notes conversion",
+        "Essay writing framework",
+        "General Studies I answer writing",
+        "General Studies II answer writing",
+        "General Studies III answer writing",
+        "General Studies IV ethics case studies",
+        "Optional subject strategy",
+        "Mains PYQ analysis",
+        "Value-added notes and examples",
+        "Full-length mains mocks and revision",
+    ],
+    "interview": [
+        "DAF analysis and profile mapping",
+        "Current affairs for interview",
+        "Opinion framing and balanced answers",
+        "Mock interview practice",
+        "Communication, posture and confidence",
+    ],
+}
 
 OPENTDB_API = "https://opentdb.com/api.php"
 
@@ -567,7 +629,7 @@ def _schedule_items(items, start_date, timeline_weeks, hours_per_week, study_day
 
 def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week):
     all_items = topics[:]
-    if roadmap_type == "career":
+    if roadmap_type in {"career", "upsc"}:
         for project in projects:
             all_items.append(f"Project: {project}")
     return _schedule_items(all_items, start_date, timeline_weeks, hours_per_week, study_days_per_week)
@@ -654,12 +716,16 @@ def create_roadmap():
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
         roadmap_type = request.form.get('roadmap_type', 'syllabus')
+        if roadmap_type not in {"syllabus", "career", "upsc"}:
+            roadmap_type = "syllabus"
         timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
         timeline_weeks = max(0, min(52, timeline_weeks))
         hours_per_week = int(request.form.get('hours_per_week', 6))
         hours_per_week = max(1, min(40, hours_per_week))
         study_days_per_week = int(request.form.get('study_days_per_week', 5))
         study_days_per_week = max(1, min(7, study_days_per_week))
+        upsc_focus = request.form.get('upsc_focus', 'full_journey').strip() or "full_journey"
+        upsc_optional_subject = request.form.get('upsc_optional_subject', '').strip()
         start_date_str = request.form.get('start_date')
         start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else datetime.utcnow().date()
 
@@ -693,6 +759,9 @@ def create_roadmap():
         use_ai = request.form.get('use_ai') == 'on'
         if confirmed_topics:
             topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
+        elif roadmap_type == "upsc":
+            topics, projects = _build_upsc_plan(upsc_optional_subject, upsc_focus)
+            _ensure_upsc_question_bank()
         elif roadmap_type == "career":
             key = _normalize(title)
             match = None
@@ -748,7 +817,10 @@ def create_roadmap():
             )
 
         if not title:
-            title = "Dream Roadmap"
+            if roadmap_type == "upsc":
+                title = "UPSC Mission"
+            else:
+                title = "Dream Roadmap"
         if not topics and roadmap_type == "syllabus":
             flash("Please provide a syllabus text or upload a file with topics.")
             return redirect(url_for('dashboard.create_roadmap'))
@@ -761,7 +833,7 @@ def create_roadmap():
         roadmap = Roadmap(
             title=title,
             roadmap_type=roadmap_type,
-            source_text=raw_text[:5000],
+            source_text=(raw_text or f"UPSC Focus: {upsc_focus}\nOptional Subject: {upsc_optional_subject}")[:5000],
             start_date=start_date,
             target_date=target_date,
             total_tasks=len(task_specs),
@@ -795,15 +867,25 @@ def create_roadmap():
                 task.last_resource_refresh = None
 
         db.session.commit()
-        if "upsc" in _normalize(title):
-            for res in UPSC_RESOURCES:
-                db.session.add(Resource(
-                    provider=res["provider"],
-                    title=res["title"],
-                    url=res["url"],
-                    summary="Official UPSC resource",
-                    score=0.9,
-                    task_id=task_ids[0]
+        if roadmap_type == "upsc" and task_ids:
+            upsc_tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+            for task in upsc_tasks:
+                for res in _upsc_resources_for_task(task.title, upsc_optional_subject):
+                    db.session.add(Resource(
+                        provider=res["provider"],
+                        title=res["title"],
+                        url=res["url"],
+                        summary="Curated UPSC resource",
+                        score=0.95,
+                        task_id=task.id
+                    ))
+            for spec in _build_upsc_test_plan(start_date, target_date, upsc_focus):
+                db.session.add(MockTestSchedule(
+                    title=spec["title"],
+                    scheduled_date=spec["scheduled_date"],
+                    duration_minutes=spec["duration_minutes"],
+                    questions_count=spec["questions_count"],
+                    roadmap_id=roadmap.id
                 ))
             db.session.commit()
         if auto_fetch:
@@ -1277,6 +1359,95 @@ def delete_roadmap(roadmap_id):
     db.session.query(Roadmap).filter_by(id=roadmap_id).delete(synchronize_session=False)
     db.session.commit()
     return redirect(url_for('dashboard.dashboard'))
+
+
+def _build_upsc_plan(optional_subject="", focus="full_journey"):
+    topics = list(UPSC_STAGE_TOPICS.get(focus, UPSC_STAGE_TOPICS["full_journey"]))
+    optional_subject = optional_subject.strip()
+    if optional_subject:
+        topics.append(f"Optional subject deep dive: {optional_subject}")
+    else:
+        topics.append("Optional subject selection and starter preparation")
+
+    projects = [
+        "Daily current affairs notes and weekly revision",
+        "PYQ drill across prelims and mains",
+        "Answer writing practice with self-review",
+        "Mock test analysis and weak-area tracker",
+    ]
+    if focus == "interview":
+        projects = [
+            "DAF question bank",
+            "Mock interview reflections",
+            "Current affairs speaking practice",
+        ]
+    return topics, projects
+
+
+def _upsc_resources_for_task(task_title, optional_subject=""):
+    title = _normalize(task_title)
+    picks = list(UPSC_RESOURCES[:3])
+    if "current affairs" in title:
+        picks.append(UPSC_RESOURCES[3])
+    if "polity" in title or "governance" in title or "constitution" in title:
+        picks.append(UPSC_RESOURCES[4])
+    if "ncert" in title or "history" in title or "geography" in title or "science" in title:
+        picks.append(UPSC_RESOURCES[5])
+    if optional_subject and "optional subject" in title:
+        picks.append({
+            "title": f"Optional subject reading plan: {optional_subject}",
+            "url": "https://upsc.gov.in/examinations/revised-syllabus-scheme",
+            "provider": "upsc",
+        })
+    unique = []
+    seen = set()
+    for item in picks:
+        key = item["url"]
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique
+
+
+def _build_upsc_test_plan(start_date, target_date, focus="full_journey"):
+    total_days = max((target_date - start_date).days, 28)
+    checkpoints = [0.2, 0.4, 0.6, 0.8, 0.92]
+    tests = []
+
+    if focus in ("full_journey", "prelims"):
+        labels = [
+            "UPSC Foundation Diagnostic Test",
+            "Prelims Sectional Mock",
+            "Prelims GS Full Mock",
+            "CSAT Full Mock",
+            "Final Prelims Revision Test",
+        ]
+    elif focus == "mains":
+        labels = [
+            "Mains GS Diagnostic",
+            "Essay Practice Test",
+            "GS Full-Length Mock",
+            "Ethics Case Study Mock",
+            "Final Mains Simulation",
+        ]
+    else:
+        labels = [
+            "DAF Diagnostic",
+            "Current Affairs Panel Round",
+            "Mock Interview 1",
+            "Mock Interview 2",
+            "Final Personality Test Drill",
+        ]
+
+    for ratio, label in zip(checkpoints, labels):
+        scheduled_date = start_date + timedelta(days=max(7, math.floor(total_days * ratio)))
+        tests.append({
+            "title": label,
+            "scheduled_date": min(scheduled_date, target_date),
+            "duration_minutes": 120 if focus != "interview" else 45,
+            "questions_count": 100 if "Prelims" in label or "CSAT" in label else 20 if focus == "interview" else 25,
+        })
+    return tests
 
 
 @dashboard_bp.route('/uploads/<path:filename>')

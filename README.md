@@ -4,6 +4,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 
 ## Features
 - Syllabus or career roadmaps with adaptive timelines (PDF/TXT/DOCX/images)
+- Dedicated UPSC roadmap mode with built-in strategy, PYQ practice, revision blocks, and automatic mock-test scheduling
 - Dynamic career skills pulled from public career taxonomies (ESCO) when you type a career goal
 - Smart task chunking with difficulty + estimated hours
 - Progress tracking with streaks, check-ins, and forecasted finish dates
@@ -97,7 +98,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **Syllabus**: Paste topics or upload a PDF/TXT. Topics become tasks.
 - **Career**: Use a built-in career template (e.g., `frontend developer`, `data analyst`) or paste your own outline.
 - **Adaptive schedule**: Leave timeline weeks blank to auto-calculate based on study hours.
-- **UPSC**: Type “UPSC” in title to trigger the UPSC master template (all major exams + resources).
+- **UPSC**: Use the dedicated `UPSC` roadmap type to generate an aspirant workflow with official resources, answer writing, PYQs, and mock tests.
 - **PYQ portal**: UPSC PYQs are linked (not copied) and tracked via the built-in 10-year tracker.
 
 ## Practice Vault API

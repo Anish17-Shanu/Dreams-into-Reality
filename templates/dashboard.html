@@ -14,7 +14,7 @@
             <article class="card">
                 <div class="card-header">
                     <h3>{{ roadmap.title }}</h3>
-                    <span class="pill">{{ roadmap.roadmap_type|capitalize }}</span>
+                    <span class="pill">{{ 'UPSC' if roadmap.roadmap_type == 'upsc' else roadmap.roadmap_type|capitalize }}</span>
                 </div>
                 <p class="muted">Timeline: {{ roadmap.start_date }} to {{ roadmap.target_date }}</p>
                 <div class="progress-row">

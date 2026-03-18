@@ -3,7 +3,7 @@
 <section class="panel">
     <div class="panel-header">
         <div>
-            <span class="pill">{{ roadmap.roadmap_type|capitalize }}</span>
+            <span class="pill">{{ 'UPSC' if roadmap.roadmap_type == 'upsc' else roadmap.roadmap_type|capitalize }}</span>
             <h1>{{ roadmap.title }}</h1>
             <p class="muted">Timeline: {{ roadmap.start_date }} to {{ roadmap.target_date }}</p>
         </div>
@@ -59,8 +59,10 @@
             <button type="submit">Quick 15‑min Win</button>
         </form>
         <div class="action-links">
+            {% if roadmap.roadmap_type == 'upsc' %}
             <a class="ghost" href="{{ url_for('dashboard.practice', roadmap_id=roadmap.id) }}">Practice Vault</a>
             <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">UPSC Quick Quiz</a>
+            {% endif %}
             <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>
             <a class="ghost" href="{{ url_for('dashboard.export_ics', roadmap_id=roadmap.id) }}">Export Calendar</a>
             <form method="POST" action="{{ url_for('dashboard.rebalance', roadmap_id=roadmap.id) }}" class="inline-form">
@@ -69,6 +71,18 @@
             </form>
         </div>
     </div>
+
+    {% if roadmap.roadmap_type == 'upsc' %}
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>UPSC Mission Control</h2>
+                <p class="muted">This roadmap includes built-in PYQ work, revision cycles, answer writing, and mock tests scheduled across your timeline.</p>
+            </div>
+        </div>
+        <p class="muted">Use Practice Vault for question work and the scheduler below for your automatic mock plan.</p>
+    </div>
+    {% endif %}
 
     <div class="panel">
         <div class="panel-header">
