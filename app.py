@@ -6,6 +6,52 @@ from dashboard.routes import dashboard_bp
 from flask_migrate import Migrate
 import os
 from werkzeug.exceptions import RequestEntityTooLarge
+from sqlalchemy import inspect, text
+
+
+def _default_sql_literal(value):
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int, float)):
+        return str(value)
+    escaped = str(value).replace("'", "''")
+    return f"'{escaped}'"
+
+
+def _build_add_column_sql(engine, table_name, column):
+    preparer = engine.dialect.identifier_preparer
+    quoted_table = preparer.quote(table_name)
+    quoted_column = preparer.quote(column.name)
+    column_type = column.type.compile(dialect=engine.dialect)
+    default_sql = ""
+
+    if column.default is not None and getattr(column.default, "is_scalar", False):
+        default_sql = f" DEFAULT {_default_sql_literal(column.default.arg)}"
+
+    return f"ALTER TABLE {quoted_table} ADD COLUMN {quoted_column} {column_type}{default_sql}"
+
+
+def ensure_schema():
+    db.create_all()
+
+    engine = db.engine
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+
+    for table in db.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+
+        existing_columns = {column["name"] for column in inspector.get_columns(table.name)}
+        missing_columns = [column for column in table.columns if column.name not in existing_columns]
+        if not missing_columns:
+            continue
+
+        with engine.begin() as connection:
+            for column in missing_columns:
+                connection.execute(text(_build_add_column_sql(engine, table.name, column)))
 
 
 app = Flask(__name__)
@@ -28,8 +74,8 @@ def handle_large_upload(error):
 
 with app.app_context():
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-    if os.getenv("AUTO_CREATE_SCHEMA", "false").lower() == "true":
-        db.create_all()
+    if os.getenv("AUTO_CREATE_SCHEMA", "true").lower() == "true":
+        ensure_schema()
 
 if __name__ == "__main__":
     import os
