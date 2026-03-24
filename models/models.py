@@ -118,10 +118,13 @@ class PyqCompletion(db.Model):
 class MockTestSchedule(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(160), nullable=False)
+    test_type = db.Column(db.String(30), default="mock")
     scheduled_date = db.Column(db.Date, nullable=False)
     duration_minutes = db.Column(db.Integer, default=90)
     questions_count = db.Column(db.Integer, default=50)
     status = db.Column(db.String(20), default="planned")  # planned | completed | missed
+    score = db.Column(db.Float, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     roadmap_id = db.Column(db.Integer, db.ForeignKey('roadmap.id'), nullable=False)
 

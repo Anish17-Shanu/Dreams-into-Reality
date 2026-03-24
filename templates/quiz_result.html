@@ -2,8 +2,9 @@
 {% block content %}
 <section class="panel">
     <div>
-        <h1>Quiz Result</h1>
-        <p class="muted">UPSC marking: +2 correct, -0.66 incorrect.</p>
+        <span class="pill">Result</span>
+        <h1>Quiz Analysis</h1>
+        <p class="muted">UPSC marking applied: +2 correct, -0.66 incorrect.</p>
     </div>
     <div class="stats-grid">
         <div class="stat-card">
@@ -22,7 +23,45 @@
             <p class="muted">Score</p>
             <h3>{{ result.score }}</h3>
         </div>
+        <div class="stat-card">
+            <p class="muted">Accuracy</p>
+            <h3>{{ accuracy }}%</h3>
+        </div>
     </div>
-    <a class="primary" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">Try another quiz</a>
+
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>What this means</h3>
+            <div class="simple-list">
+                {% for item in analysis %}
+                <div>
+                    <p class="muted">{{ item }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+        <article class="card soft-card">
+            <h3>Best next step</h3>
+            <div class="simple-list">
+                <div>
+                    <strong>If accuracy is low</strong>
+                    <p class="muted">Revise core concepts and take a shorter test again.</p>
+                </div>
+                <div>
+                    <strong>If accuracy is moderate</strong>
+                    <p class="muted">Do PYQs and topic revision before the next mock.</p>
+                </div>
+                <div>
+                    <strong>If accuracy is high</strong>
+                    <p class="muted">Increase question volume or difficulty to stretch yourself.</p>
+                </div>
+            </div>
+        </article>
+    </div>
+
+    <div class="hero-actions">
+        <a class="primary" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">Take another quiz</a>
+        <a class="ghost" href="{{ url_for('dashboard.practice', roadmap_id=roadmap.id) }}">Back to Practice Vault</a>
+    </div>
 </section>
 {% endblock %}

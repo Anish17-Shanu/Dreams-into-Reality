@@ -1,11 +1,19 @@
 {% extends 'base.html' %}
 {% block content %}
+{% set ns = namespace(next_task=None) %}
+{% for item in tasks %}
+    {% if ns.next_task is none and item.status != 'done' %}
+        {% set ns.next_task = item %}
+    {% endif %}
+{% endfor %}
+
 <section class="panel">
-    <div class="panel-header">
+    <div class="panel-header panel-header-start">
         <div>
             <span class="pill">{{ 'UPSC' if roadmap.roadmap_type == 'upsc' else roadmap.roadmap_type|capitalize }}</span>
             <h1>{{ roadmap.title }}</h1>
             <p class="muted">Timeline: {{ roadmap.start_date }} to {{ roadmap.target_date }}</p>
+            <p class="muted">Progress: {{ roadmap.completed_tasks }} of {{ roadmap.total_tasks }} tasks completed</p>
         </div>
         <div class="progress-inline">
             <div class="progress">
@@ -14,75 +22,149 @@
             <span>{{ progress }}%</span>
         </div>
     </div>
-    <div class="dream-meter">
-        <div class="dream-meter-fill" style="width: {{ progress }}%"></div>
-    </div>
-    <p class="muted">Dream meter: every task adds fuel.</p>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <p class="muted">Streak</p>
-            <h3>{{ roadmap.streak }} days</h3>
-            <p class="muted">Last check-in: {{ last_checkin }}</p>
-        </div>
-        <div class="stat-card">
-            <p class="muted">Estimated hours</p>
-            <h3>{{ roadmap.total_hours_est }}</h3>
-            <p class="muted">{{ roadmap.hours_per_week }} hrs/week</p>
-        </div>
-        <div class="stat-card">
-            <p class="muted">Forecast</p>
-            <h3>{{ forecast if forecast else 'Build momentum' }}</h3>
-            <p class="muted">Based on your pace</p>
-        </div>
-        <div class="stat-card">
-            <p class="muted">Resource fetch</p>
-            <h3>
-                {{ roadmap.resource_fetch_status|capitalize }}
-                {% if roadmap.resource_fetch_status == 'running' %}
-                    <span class="spinner" aria-hidden="true"></span>
-                {% endif %}
-            </h3>
-            <p class="muted">Runs in background</p>
-        </div>
+    <div class="grid grid-3 compact-grid">
+        <article class="card soft-card">
+            <p class="eyebrow">Today</p>
+            <h3>{{ today_focus.next_task.title if today_focus.next_task else 'You are caught up' }}</h3>
+            <p class="muted">{% if today_focus.next_task %}Best next step to keep momentum.{% else %}Review your notes or take a light revision session.{% endif %}</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Next test</p>
+            <h3>{{ today_focus.next_test.title if today_focus.next_test else 'No test scheduled' }}</h3>
+            <p class="muted">{% if today_focus.next_test %}Scheduled for {{ today_focus.next_test.scheduled_date }}.{% else %}Add a checkpoint to keep exam rhythm strong.{% endif %}</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Revision focus</p>
+            <h3>{{ today_focus.revision_task.title if today_focus.revision_task else 'Revision block pending' }}</h3>
+            <p class="muted">{{ today_focus.due_soon_count }} task(s) need attention soon.</p>
+        </article>
     </div>
 
-    <div class="panel-actions">
-        <form method="POST" action="{{ url_for('dashboard.checkin', roadmap_id=roadmap.id) }}" class="inline-form">
-            <input type="number" name="minutes" min="0" placeholder="Minutes studied">
-            <input type="text" name="note" placeholder="Reflection note (optional)">
-            <button type="submit">Log a Win</button>
-        </form>
-        <form method="POST" action="{{ url_for('dashboard.checkin', roadmap_id=roadmap.id) }}" class="quick-checkin">
-            <input type="hidden" name="minutes" value="15">
-            <input type="hidden" name="note" value="Quick check-in">
-            <button type="submit">Quick 15-min Win</button>
-        </form>
-        <div class="action-links">
-            {% if roadmap.roadmap_type == 'upsc' %}
-            <a class="ghost" href="{{ url_for('dashboard.practice', roadmap_id=roadmap.id) }}">Practice Vault</a>
-            <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">UPSC Quick Quiz</a>
-            {% endif %}
-            <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>
-            <a class="ghost" href="{{ url_for('dashboard.export_ics', roadmap_id=roadmap.id) }}">Export Calendar</a>
-            <form method="POST" action="{{ url_for('dashboard.rebalance', roadmap_id=roadmap.id) }}" class="inline-form">
-                <input type="number" name="timeline_weeks" min="0" max="52" placeholder="Weeks">
-                <button type="submit" class="ghost">Rebalance timeline</button>
-            </form>
-        </div>
+    <div class="grid grid-3 compact-grid">
+        <article class="card summary-card">
+            <p class="eyebrow">Next task</p>
+            <h3>{{ ns.next_task.title if ns.next_task else 'All tasks completed' }}</h3>
+            <p class="muted">{% if ns.next_task %}Due {{ ns.next_task.due_date or 'when you are ready' }}{% else %}You are caught up on this plan.{% endif %}</p>
+        </article>
+        <article class="card summary-card">
+            <p class="eyebrow">Study rhythm</p>
+            <h3>{{ roadmap.hours_per_week }} hrs/week</h3>
+            <p class="muted">{{ roadmap.study_days_per_week }} study days each week</p>
+        </article>
+        <article class="card summary-card">
+            <p class="eyebrow">Timeline</p>
+            <h3>{{ roadmap.target_date }}</h3>
+            <p class="muted">{% if forecast %}Expected finish based on progress: {{ forecast }}{% else %}This plan auto-adjusts as you move forward.{% endif %}</p>
+        </article>
     </div>
 
-    {% if roadmap.roadmap_type == 'upsc' %}
-    <div class="panel">
-        <div class="panel-header">
-            <div>
-                <h2>UPSC Mission Control</h2>
-                <p class="muted">This roadmap includes built-in PYQ work, revision cycles, answer writing, and mock tests scheduled across your timeline.</p>
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>This Week</h3>
+            {% if week_plan.tasks or week_plan.tests %}
+            <div class="simple-list">
+                {% for task in week_plan.tasks %}
+                <div>
+                    <strong>{{ task.title }}</strong>
+                    <p class="muted">Task due {{ task.due_date }}</p>
+                </div>
+                {% endfor %}
+                {% for test in week_plan.tests %}
+                <div>
+                    <strong>{{ test.title }}</strong>
+                    <p class="muted">{{ test.test_type|replace('_', ' ')|title }} on {{ test.scheduled_date }}</p>
+                </div>
+                {% endfor %}
             </div>
-        </div>
-        <p class="muted">Use Practice Vault for question work and track each stage separately below.</p>
+            {% else %}
+            <p class="muted">No fixed items this week. Use the time for revision or catch-up.</p>
+            {% endif %}
+        </article>
+        <article class="card soft-card">
+            <h3>Readiness</h3>
+            <div class="simple-list">
+                {% for metric in readiness_metrics %}
+                <div>
+                    <strong>{{ metric.label }}: {{ metric.value }}%</strong>
+                    <div class="progress">
+                        <div class="progress-bar" style="width: {{ metric.value }}%"></div>
+                    </div>
+                    <p class="muted">{{ metric.hint }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
     </div>
 
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Quick progress update</h3>
+            <form method="POST" action="{{ url_for('dashboard.checkin', roadmap_id=roadmap.id) }}" class="stack">
+                <div class="inline-fields">
+                    <label>
+                        Minutes studied
+                        <input type="number" name="minutes" min="0" placeholder="30">
+                    </label>
+                    <label>
+                        Note
+                        <input type="text" name="note" placeholder="What did you finish today?">
+                    </label>
+                </div>
+                <button type="submit">Save update</button>
+            </form>
+            <form method="POST" action="{{ url_for('dashboard.checkin', roadmap_id=roadmap.id) }}" class="quick-checkin-inline">
+                <input type="hidden" name="minutes" value="15">
+                <input type="hidden" name="note" value="Quick check-in">
+                <button type="submit" class="ghost">Quick 15-minute check-in</button>
+            </form>
+        </article>
+        <article class="card soft-card">
+            <h3>Helpful actions</h3>
+            <div class="action-links">
+                {% if roadmap.roadmap_type == 'upsc' %}
+                <a class="ghost" href="{{ url_for('dashboard.practice', roadmap_id=roadmap.id) }}">Practice Vault</a>
+                <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">Quick Quiz</a>
+                {% endif %}
+                <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>
+                <a class="ghost" href="{{ url_for('dashboard.export_ics', roadmap_id=roadmap.id) }}">Export Calendar</a>
+            </div>
+            <form method="POST" action="{{ url_for('dashboard.rebalance', roadmap_id=roadmap.id) }}" class="inline-form">
+                <input type="number" name="timeline_weeks" min="0" max="52" placeholder="New timeline in weeks">
+                <button type="submit" class="ghost">Rebuild remaining dates</button>
+            </form>
+            <p class="muted">Resource status: {{ roadmap.resource_fetch_status|capitalize }}</p>
+            <p class="muted">Streak: {{ roadmap.streak }} days | Last check-in: {{ last_checkin }}</p>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Milestones</h2>
+            <p class="muted">These achievements make progress feel real and visible.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        {% for milestone in milestones %}
+        <article class="card milestone-card {% if milestone.done %}milestone-done{% endif %}">
+            <p class="eyebrow">{% if milestone.done %}Achieved{% else %}In progress{% endif %}</p>
+            <h3>{{ milestone.title }}</h3>
+            <p class="muted">{{ milestone.detail }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+{% if roadmap.roadmap_type == 'upsc' %}
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>UPSC Mission Overview</h2>
+            <p class="muted">Track your preparation by stage so you always know where you stand.</p>
+        </div>
+    </div>
     <div class="upsc-bucket-grid">
         {% for bucket in upsc_buckets %}
         <article class="bucket-card">
@@ -96,7 +178,7 @@
             <div class="progress">
                 <div class="progress-bar" style="width: {{ bucket.progress }}%"></div>
             </div>
-            <p class="muted bucket-tests">Tests: {{ bucket.test_completed }}/{{ bucket.test_total }} completed</p>
+            <p class="muted bucket-tests">Tests completed: {{ bucket.test_completed }}/{{ bucket.test_total }}</p>
             {% if bucket.tests %}
             <div class="bucket-chip-row">
                 {% for test in bucket.tests %}
@@ -104,130 +186,162 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="muted">No scheduled tests in this stage yet.</p>
+            <p class="muted">No tests in this stage yet.</p>
             {% endif %}
         </article>
         {% endfor %}
     </div>
-    {% endif %}
+</section>
+{% endif %}
 
-    <div class="panel">
-        <div class="panel-header">
-            <div>
-                <h2>Mock Test Scheduler</h2>
-                <p class="muted">Plan no-extra-load mock tests and track completion.</p>
-            </div>
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Progress Notes</h2>
+            <p class="muted">Your updates and task comments appear here so you can quickly see how far you have come.</p>
         </div>
-        <form method="POST" action="{{ url_for('dashboard.schedule_test', roadmap_id=roadmap.id) }}" class="inline-form">
-            <input type="text" name="title" placeholder="Mock Test - GS Paper I">
-            <input type="date" name="scheduled_date">
-            <input type="number" name="duration_minutes" min="30" max="240" value="90">
-            <input type="number" name="questions_count" min="10" max="200" value="50">
-            <button type="submit">Schedule</button>
-        </form>
-        {% if tests %}
-            <div class="task-list">
-                {% if roadmap.roadmap_type == 'upsc' %}
-                    {% for bucket in upsc_buckets %}
-                        {% if bucket.tests %}
-                        <section class="test-bucket">
-                            <div class="panel-header">
-                                <div>
-                                    <h3>{{ bucket.name }} Tests</h3>
-                                    <p class="muted">{{ bucket.test_completed }}/{{ bucket.test_total }} finished</p>
-                                </div>
-                            </div>
-                            <div class="task-list">
-                                {% for test in bucket.tests %}
-                                <article class="task-card">
-                                    <h3>{{ test.title }}</h3>
-                                    <p class="muted">Date: {{ test.scheduled_date }} | {{ test.duration_minutes }} min | {{ test.questions_count }} Qs</p>
-                                    <form method="POST" action="{{ url_for('dashboard.update_test_status', roadmap_id=roadmap.id, test_id=test.id) }}" class="inline-form">
-                                        <select name="status">
-                                            <option value="planned" {% if test.status == 'planned' %}selected{% endif %}>Planned</option>
-                                            <option value="completed" {% if test.status == 'completed' %}selected{% endif %}>Completed</option>
-                                            <option value="missed" {% if test.status == 'missed' %}selected{% endif %}>Missed</option>
-                                        </select>
-                                        <button type="submit">Update</button>
-                                    </form>
-                                </article>
-                                {% endfor %}
-                            </div>
-                        </section>
-                        {% endif %}
-                    {% endfor %}
-                {% else %}
-                    {% for test in tests %}
-                    <article class="task-card">
-                        <h3>{{ test.title }}</h3>
-                        <p class="muted">Date: {{ test.scheduled_date }} | {{ test.duration_minutes }} min | {{ test.questions_count }} Qs</p>
-                        <form method="POST" action="{{ url_for('dashboard.update_test_status', roadmap_id=roadmap.id, test_id=test.id) }}" class="inline-form">
-                            <select name="status">
-                                <option value="planned" {% if test.status == 'planned' %}selected{% endif %}>Planned</option>
-                                <option value="completed" {% if test.status == 'completed' %}selected{% endif %}>Completed</option>
-                                <option value="missed" {% if test.status == 'missed' %}selected{% endif %}>Missed</option>
-                            </select>
-                            <button type="submit">Update</button>
-                        </form>
-                    </article>
-                    {% endfor %}
-                {% endif %}
-            </div>
-        {% else %}
-            <p class="muted">No mock tests scheduled yet.</p>
-        {% endif %}
     </div>
+    {% if recent_updates %}
+    <div class="update-list">
+        {% for update in recent_updates %}
+        <article class="update-card">
+            <p class="eyebrow">{{ update.kind }}</p>
+            <h3>{{ update.title }}</h3>
+            <p class="muted">{{ update.body }}</p>
+            <p class="muted">{{ update.when.strftime("%Y-%m-%d %H:%M") if update.when else '' }}</p>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No progress notes yet. Start by saving a task note or quick study update.</p>
+    {% endif %}
+</section>
 
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Mock Tests</h2>
+            <p class="muted">Add tests here if you want fixed checkpoints in your plan.</p>
+        </div>
+    </div>
+    <form method="POST" action="{{ url_for('dashboard.schedule_test', roadmap_id=roadmap.id) }}" class="inline-form">
+        <input type="text" name="title" placeholder="Mock Test - GS Paper I">
+        <select name="test_type">
+            <option value="diagnostic">Diagnostic</option>
+            <option value="sectional">Sectional</option>
+            <option value="full_length">Full-Length</option>
+            <option value="revision">Revision</option>
+            <option value="essay">Essay</option>
+            <option value="interview">Interview</option>
+        </select>
+        <input type="date" name="scheduled_date">
+        <input type="number" name="duration_minutes" min="30" max="240" value="90">
+        <input type="number" name="questions_count" min="10" max="200" value="50">
+        <input type="text" name="notes" placeholder="Weak area or goal for this test">
+        <button type="submit">Add test</button>
+    </form>
+    {% if tests %}
     <div class="task-list">
-        {% for task in tasks %}
-            <article class="task-card" id="task-{{ task.id }}">
-                <div class="task-meta">
-                    <span class="task-index">#{{ task.order_index }}</span>
-                    <div>
-                        <h3>{{ task.title }}</h3>
-                        <p class="muted">Due: {{ task.due_date or 'Flexible' }} | Difficulty: {{ task.difficulty }}</p>
-                    </div>
-                </div>
-                <div class="task-details">
-                    <p class="muted">Estimated: {{ task.estimated_hours }} hrs | Actual: {{ task.actual_hours }} hrs</p>
-                    {% if task.evidence_path %}
-                        <a class="ghost" href="{{ url_for('dashboard.get_upload', filename=task.evidence_path) }}">Download evidence</a>
+        {% for test in tests %}
+        <article class="task-card">
+            <div class="task-meta">
+                <div>
+                    <h3>{{ test.title }}</h3>
+                    <p class="muted">{{ test.test_type|replace('_', ' ')|title }} | Date: {{ test.scheduled_date }} | {{ test.duration_minutes }} min | {{ test.questions_count }} questions</p>
+                    {% if test.notes %}
+                    <p class="muted">Focus: {{ test.notes }}</p>
                     {% endif %}
                 </div>
-                <form method="POST" action="{{ url_for('dashboard.update_task_status', roadmap_id=roadmap.id, task_id=task.id) }}" class="task-actions" enctype="multipart/form-data">
-                    <select name="status">
-                        <option value="todo" {% if task.status == 'todo' %}selected{% endif %}>To do</option>
-                        <option value="doing" {% if task.status == 'doing' %}selected{% endif %}>In progress</option>
-                        <option value="done" {% if task.status == 'done' %}selected{% endif %}>Done</option>
-                    </select>
-                    <select name="completion_type">
-                        <option value="planned" {% if task.completion_type == 'planned' %}selected{% endif %}>As planned</option>
-                        <option value="alternative" {% if task.completion_type == 'alternative' %}selected{% endif %}>Done differently</option>
-                    </select>
-                    <input type="number" step="0.5" name="actual_hours" placeholder="Actual hours">
-                    <input type="text" name="notes" placeholder="Notes or reflection">
-                    <input type="file" name="evidence">
-                    <button type="submit">Update</button>
-                </form>
+            </div>
+            <form method="POST" action="{{ url_for('dashboard.update_test_status', roadmap_id=roadmap.id, test_id=test.id) }}" class="inline-form">
+                <select name="status">
+                    <option value="planned" {% if test.status == 'planned' %}selected{% endif %}>Planned</option>
+                    <option value="completed" {% if test.status == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="missed" {% if test.status == 'missed' %}selected{% endif %}>Missed</option>
+                </select>
+                <input type="number" step="0.1" name="score" placeholder="Score" value="{{ test.score if test.score is not none else '' }}">
+                <input type="text" name="notes" placeholder="Analysis or weak areas" value="{{ test.notes or '' }}">
+                <button type="submit">Save</button>
+            </form>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No tests scheduled yet.</p>
+    {% endif %}
+</section>
 
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Tasks</h2>
+            <p class="muted">Update one task at a time. You do not need to fill every field.</p>
+        </div>
+    </div>
+    <div class="task-list">
+        {% for task in tasks %}
+        <article class="task-card" id="task-{{ task.id }}">
+            <div class="task-meta">
+                <span class="task-index">Step {{ task.order_index }}</span>
+                <div>
+                    <h3>{{ task.title }}</h3>
+                    <p class="muted">Due: {{ task.due_date or 'Flexible' }} | Difficulty: {{ task.difficulty }}</p>
+                </div>
+            </div>
+            <div class="task-details">
+                <p class="muted">Estimated: {{ task.estimated_hours }} hrs | Actual: {{ task.actual_hours }} hrs</p>
+                {% if task.evidence_path %}
+                <a class="ghost" href="{{ url_for('dashboard.get_upload', filename=task.evidence_path) }}">Open attachment</a>
+                {% endif %}
+            </div>
+            <form method="POST" action="{{ url_for('dashboard.update_task_status', roadmap_id=roadmap.id, task_id=task.id) }}" class="task-actions" enctype="multipart/form-data">
+                <select name="status">
+                    <option value="todo" {% if task.status == 'todo' %}selected{% endif %}>To do</option>
+                    <option value="doing" {% if task.status == 'doing' %}selected{% endif %}>In progress</option>
+                    <option value="done" {% if task.status == 'done' %}selected{% endif %}>Done</option>
+                </select>
+                <select name="completion_type">
+                    <option value="planned" {% if task.completion_type == 'planned' %}selected{% endif %}>Done as planned</option>
+                    <option value="alternative" {% if task.completion_type == 'alternative' %}selected{% endif %}>Done in another way</option>
+                </select>
+                <input type="number" step="0.5" name="actual_hours" placeholder="Hours spent">
+                <input type="text" name="notes" placeholder="Short note">
+                <input type="file" name="evidence">
+                <button type="submit">Save task</button>
+            </form>
+
+            <details class="resource-details" {% if resource_groups_map.get(task.id, []) %}open{% endif %}>
+                <summary>Learn with resources</summary>
                 <div class="resource-header">
-                    <h4>Resources</h4>
+                    <p class="muted">Open a resource, learn from it, then come back and continue the task.</p>
                     <form method="POST" action="{{ url_for('dashboard.refresh_resources', roadmap_id=roadmap.id, task_id=task.id) }}">
-                        <button type="submit" class="ghost">Refresh</button>
+                        <button type="submit" class="ghost">Refresh resources</button>
                     </form>
                 </div>
-
-                {% set resources = resources_map.get(task.id, []) %}
-                {% if resources %}
-                    <div class="resource-list">
-                        {% for res in resources %}
+                {% set resource_groups = resource_groups_map.get(task.id, []) %}
+                {% if resource_groups %}
+                <div class="resource-list">
+                    {% for group in resource_groups %}
+                    <div class="resource-group-card">
+                        <h4>{{ group.label }}</h4>
+                        <div class="resource-group-list">
+                            {% for res in group.resources %}
                             <div class="resource-card">
-                                <a href="{{ res.url }}" target="_blank" rel="noopener">
+                                <div class="resource-main">
                                     <span class="resource-pill">{{ res.provider|capitalize }}</span>
                                     <strong>{{ res.title }}</strong>
-                                    <span class="muted">{{ res.summary }}</span>
+                                    <div class="chip-row">
+                                        {% for tag in res.tags %}
+                                        <span class="chip">{{ tag }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    <span class="muted">{{ res.summary or 'Open this resource to study the topic in more detail.' }}</span>
+                                    <span class="muted">{{ res.use_case }}</span>
                                     <span class="muted">Rating: {{ res.rating_avg }} ({{ res.rating_count }})</span>
-                                </a>
+                                </div>
+                                <div class="resource-actions">
+                                    <a class="primary-link" href="{{ res.url }}" target="_blank" rel="noopener">Open resource</a>
+                                </div>
                                 <form method="POST" action="{{ url_for('dashboard.resource_feedback', roadmap_id=roadmap.id, resource_id=res.id) }}" class="resource-feedback">
                                     <select name="rating">
                                         <option value="">Rate</option>
@@ -245,12 +359,16 @@
                                     <button type="submit">Send</button>
                                 </form>
                             </div>
-                        {% endfor %}
+                            {% endfor %}
+                        </div>
                     </div>
+                    {% endfor %}
+                </div>
                 {% else %}
-                    <p class="muted">No external resources fetched for this task yet.</p>
+                <p class="muted">No resources fetched for this task yet.</p>
                 {% endif %}
-            </article>
+            </details>
+        </article>
         {% endfor %}
     </div>
 </section>

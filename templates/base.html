@@ -10,29 +10,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Sora:wght@300;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="sky-layer stars"></div>
-    <div class="sky-layer mist"></div>
-    <div class="floating-cloud cloud-1"></div>
-    <div class="floating-cloud cloud-2"></div>
-    <div class="confetti" aria-hidden="true"></div>
     <header class="topbar">
         <div class="brand">
             <span class="brand-mark">DIR</span>
             <div>
                 <span class="brand-text">Dreams into Reality</span>
-                <span class="brand-tagline">Turn spark into streaks</span>
+                <span class="brand-tagline">Clear plans for real people</span>
             </div>
         </div>
         <nav class="nav">
             {% if session.get('user_id') %}
-                <a href="{{ url_for('dashboard.dashboard') }}">Dreamboard</a>
-                <a href="{{ url_for('dashboard.create_roadmap') }}">New Mission</a>
+                <a href="{{ url_for('dashboard.dashboard') }}">My Plans</a>
+                <a href="{{ url_for('dashboard.create_roadmap') }}">Create Plan</a>
                 <a href="{{ url_for('dashboard.create_upsc_roadmap') }}">UPSC Mission</a>
-                <button type="button" class="ghost calm-toggle" aria-pressed="false">Calm Mode</button>
-                <a href="{{ url_for('auth.logout') }}" class="nav-cta">Logout</a>
+                <a href="{{ url_for('auth.logout') }}" class="nav-cta">Log out</a>
             {% else %}
                 <a href="{{ url_for('auth.login') }}">Login</a>
-                <a href="{{ url_for('auth.register') }}" class="nav-cta">Start the Journey</a>
+                <a href="{{ url_for('auth.register') }}" class="nav-cta">Get Started</a>
             {% endif %}
         </nav>
     </header>
@@ -48,29 +42,5 @@
         {% endwith %}
         {% block content %}{% endblock %}
     </main>
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        if (params.get("celebrate") === "1") {
-            document.body.classList.add("celebrate");
-            setTimeout(() => document.body.classList.remove("celebrate"), 2200);
-        }
-        const calmToggle = document.querySelector(".calm-toggle");
-        const applyCalm = (enabled) => {
-            document.body.classList.toggle("calm", enabled);
-            if (calmToggle) {
-                calmToggle.setAttribute("aria-pressed", enabled ? "true" : "false");
-                calmToggle.textContent = enabled ? "Calm Mode: On" : "Calm Mode";
-            }
-        };
-        if (calmToggle) {
-            const stored = localStorage.getItem("dir_calm_mode");
-            applyCalm(stored === "true");
-            calmToggle.addEventListener("click", () => {
-                const next = !document.body.classList.contains("calm");
-                localStorage.setItem("dir_calm_mode", next ? "true" : "false");
-                applyCalm(next);
-            });
-        }
-    </script>
 </body>
 </html>

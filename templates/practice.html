@@ -1,13 +1,69 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="panel">
-    <div>
-        <h1>Practice Vault</h1>
-        <p class="muted">Self-check your progress with prompt-style questions and quick scoring.</p>
+    <div class="panel-header panel-header-start">
+        <div>
+            <span class="pill">Practice</span>
+            <h1>Practice Vault</h1>
+            <p class="muted">Track PYQs, answer-writing effort, and readiness in one place.</p>
+        </div>
     </div>
+
+    <div class="grid grid-3 compact-grid">
+        <article class="card summary-card">
+            <p class="eyebrow">PYQ coverage</p>
+            <h3>{{ pyq_total }}</h3>
+            <p class="muted">Years marked complete across tracked exams.</p>
+        </article>
+        <article class="card summary-card">
+            <p class="eyebrow">Answer writing</p>
+            <h3>{{ avg_score }}/5</h3>
+            <p class="muted">Average self-score from saved practice answers.</p>
+        </article>
+        <article class="card summary-card">
+            <p class="eyebrow">Best next move</p>
+            <h3>{% if pyq_total < 10 %}Do more PYQs{% elif avg_score < 3.5 %}Practice writing{% else %}Take a test{% endif %}</h3>
+            <p class="muted">The app nudges you toward the highest-value next step.</p>
+        </article>
+    </div>
+
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Readiness Snapshot</h3>
+            <div class="simple-list">
+                {% for metric in readiness_metrics %}
+                <div>
+                    <strong>{{ metric.label }}: {{ metric.value }}%</strong>
+                    <div class="progress">
+                        <div class="progress-bar" style="width: {{ metric.value }}%"></div>
+                    </div>
+                    <p class="muted">{{ metric.hint }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+        <article class="card soft-card">
+            <h3>How to use this page</h3>
+            <div class="simple-list">
+                <div>
+                    <strong>1. Mark PYQ years</strong>
+                    <p class="muted">This keeps your past-paper coverage visible.</p>
+                </div>
+                <div>
+                    <strong>2. Save answer-writing scores</strong>
+                    <p class="muted">Even quick self-scoring helps build consistency.</p>
+                </div>
+                <div>
+                    <strong>3. Return here weekly</strong>
+                    <p class="muted">Use it as your practice and revision checkpoint.</p>
+                </div>
+            </div>
+        </article>
+    </div>
+
     <div class="pyq-tracker">
         <h3>PYQ 10-Year Tracker</h3>
-        <p class="muted">Mark completed years for each exam. We link official UPSC PYQ portal in the roadmap.</p>
+        <p class="muted">Mark completed years for each exam. This is one of the strongest readiness signals for UPSC.</p>
         <form method="POST" action="{{ url_for('dashboard.pyq_tracker', roadmap_id=roadmap.id) }}" class="stack" data-done='{{ done_map | tojson }}'>
             <label>
                 Exam
@@ -25,9 +81,10 @@
                     </label>
                 {% endfor %}
             </div>
-            <button type="submit">Save PYQ Progress</button>
+            <button type="submit">Save PYQ progress</button>
         </form>
     </div>
+
     <div class="question-grid">
         {% for q in questions %}
             <article class="question-card">
@@ -40,13 +97,13 @@
                 <form method="POST" action="{{ url_for('dashboard.attempt_question', question_id=q.id) }}" class="inline-form">
                     <label>
                         Score (0-5)
-                        <input type="number" name="score" min="0" max="5" value="3">
+                        <input type="number" name="score" min="0" max="5" value="{{ attempts.get(q.id).score if attempts.get(q.id) else 3 }}">
                     </label>
-                    <input type="text" name="notes" placeholder="Notes">
-                    <button type="submit">Save</button>
+                    <input type="text" name="notes" placeholder="What will you improve next time?">
+                    <button type="submit">Save answer practice</button>
                 </form>
                 {% if attempts.get(q.id) %}
-                    <p class="muted">Last score: {{ attempts.get(q.id).score }}</p>
+                    <p class="muted">Last score: {{ attempts.get(q.id).score }} | Last note: {{ attempts.get(q.id).notes or 'No note added' }}</p>
                 {% endif %}
             </article>
         {% endfor %}

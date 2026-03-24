@@ -1,10 +1,49 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="panel">
-    <div>
-        <h1>UPSC Quick Quiz</h1>
-        <p class="muted">Negative marking applied: +2 for correct, -0.66 for incorrect, 0 for skipped.</p>
+    <div class="panel-header panel-header-start">
+        <div>
+            <span class="pill">Test</span>
+            <h1>UPSC Quick Quiz</h1>
+            <p class="muted">Use this as a diagnostic, sectional accuracy check, or revision test. Negative marking is applied: +2 correct, -0.66 incorrect.</p>
+        </div>
     </div>
+
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Customize this test</h3>
+            <form method="GET" action="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}" class="inline-form">
+                <select name="difficulty">
+                    <option value="easy" {% if selected_difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                    <option value="medium" {% if selected_difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                    <option value="hard" {% if selected_difficulty == 'hard' %}selected{% endif %}>Hard</option>
+                </select>
+                <select name="amount">
+                    <option value="5" {% if selected_amount == 5 %}selected{% endif %}>5 questions</option>
+                    <option value="10" {% if selected_amount == 10 %}selected{% endif %}>10 questions</option>
+                    <option value="15" {% if selected_amount == 15 %}selected{% endif %}>15 questions</option>
+                    <option value="20" {% if selected_amount == 20 %}selected{% endif %}>20 questions</option>
+                </select>
+                <button type="submit">Build quiz</button>
+            </form>
+        </article>
+        <article class="card soft-card">
+            <h3>Recent quiz trend</h3>
+            {% if recent_results %}
+            <div class="simple-list">
+                {% for item in recent_results %}
+                <div>
+                    <strong>Score {{ item.score }}</strong>
+                    <p class="muted">{{ item.correct }}/{{ item.total_questions }} correct on {{ item.attempted_at.strftime("%Y-%m-%d") }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="muted">No quiz history yet. Your first attempt will set the baseline.</p>
+            {% endif %}
+        </article>
+    </div>
+
     <form method="POST" action="{{ url_for('dashboard.quiz_submit', roadmap_id=roadmap.id) }}" class="stack">
         <input type="hidden" name="total" value="{{ questions|length }}">
         {% for q in questions %}
@@ -21,7 +60,7 @@
                 </div>
             </article>
         {% endfor %}
-        <button type="submit">Submit Quiz</button>
+        <button type="submit">Submit quiz</button>
     </form>
 </section>
 {% endblock %}

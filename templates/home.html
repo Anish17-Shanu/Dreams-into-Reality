@@ -2,28 +2,50 @@
 {% block content %}
 <section class="hero hero-wide">
     <div>
-        <span class="pill">Dreams into Reality</span>
-        <h1>Turn a messy goal into a steady system.</h1>
-        <p class="muted">Upload a syllabus or type a career goal. We turn the chaos into a clear roadmap with timelines, streaks, resources, and small wins that compound.</p>
+        <span class="pill">Simple planning</span>
+        <h1>Turn one goal into a step-by-step plan.</h1>
+        <p class="muted">Paste a syllabus, describe a career goal, or build a UPSC mission. We organize it into a clear plan you can actually follow.</p>
         <div class="hero-actions">
-            <a class="primary" href="{{ url_for('auth.register') }}">Start the Journey</a>
+            <a class="primary" href="{{ url_for('auth.register') }}">Create Free Account</a>
             <a class="ghost" href="{{ url_for('auth.login') }}">I already have an account</a>
         </div>
-        <p class="muted">Preparing for civil services? Use the dedicated UPSC Mission after signing in for a separate exam-focused workspace.</p>
-        <div class="spark-row">
-            <span class="spark">spark</span>
-            <span>Build momentum one mission at a time.</span>
+        <div class="steps-row">
+            <div class="step-chip">1. Add your goal</div>
+            <div class="step-chip">2. Review the plan</div>
+            <div class="step-chip">3. Track daily progress</div>
         </div>
     </div>
-    <div class="hero-card">
-        <h3>Your dream kit</h3>
-        <div class="chip-row">
-            <span class="chip">Syllabus to Plan</span>
-            <span class="chip">Career to Skills</span>
-            <span class="chip">Tasks to Progress</span>
-            <span class="chip">UPSC Mission</span>
+    <div class="hero-card hero-card-soft">
+        <h3>Choose your path</h3>
+        <div class="simple-list">
+            <div>
+                <strong>Study plan</strong>
+                <p class="muted">Turn a syllabus or topic list into weekly tasks.</p>
+            </div>
+            <div>
+                <strong>Career plan</strong>
+                <p class="muted">Break a role like data analyst or frontend developer into learnable steps.</p>
+            </div>
+            <div>
+                <strong>UPSC mission</strong>
+                <p class="muted">Get a dedicated civil services workflow with PYQs, revision, and mocks.</p>
+            </div>
         </div>
-        <p class="muted">The main planner stays clean for everyday users, while UPSC gets its own separate mission flow, resources, and tests.</p>
     </div>
+</section>
+
+<section class="grid grid-3">
+    <article class="card">
+        <h3>Clear inputs</h3>
+        <p class="muted">Use plain language. No technical setup is needed to start.</p>
+    </article>
+    <article class="card">
+        <h3>Editable before save</h3>
+        <p class="muted">Review topics first, then generate the final roadmap only when it looks right.</p>
+    </article>
+    <article class="card">
+        <h3>Built for consistency</h3>
+        <p class="muted">Track tasks, log study time, and keep moving without feeling lost.</p>
+    </article>
 </section>
 {% endblock %}

@@ -104,6 +104,408 @@ UPSC_RESOURCES = [
     {"title": "NCERT Textbooks Portal", "url": "https://ncert.nic.in/textbook.php", "provider": "ncert"},
 ]
 
+UPSC_CURATED_RESOURCES = [
+    {
+        "title": "UPSC Revised Syllabus and Scheme",
+        "url": "https://upsc.gov.in/examinations/revised-syllabus-scheme",
+        "provider": "upsc",
+        "bucket": "Official source",
+        "tags": ["Official", "All stages", "Must use"],
+        "use_case": "Start every subject from the official syllabus so your preparation stays aligned with the exam.",
+        "topics": ["strategy", "foundation", "prelims", "mains", "interview", "optional"],
+    },
+    {
+        "title": "UPSC Previous Question Papers",
+        "url": "https://upsc.gov.in/examinations/previous-question-papers",
+        "provider": "upsc",
+        "bucket": "Official source",
+        "tags": ["Official", "PYQ", "High value"],
+        "use_case": "Use PYQs to understand pattern, question language, and topic priority before adding new study material.",
+        "topics": ["pyq", "prelims", "mains", "essay", "optional", "csat"],
+    },
+    {
+        "title": "UPSC Exam Calendar",
+        "url": "https://upsc.gov.in/examinations/exam-calendar",
+        "provider": "upsc",
+        "bucket": "Official source",
+        "tags": ["Official", "Timeline"],
+        "use_case": "Anchor your milestones, mock schedule, and revision buffers around official dates.",
+        "topics": ["strategy", "timeline", "prelims", "mains", "interview"],
+    },
+    {
+        "title": "NCERT Textbooks Portal",
+        "url": "https://ncert.nic.in/textbook.php",
+        "provider": "ncert",
+        "bucket": "Start here",
+        "tags": ["Beginner", "Foundation", "Static subjects"],
+        "use_case": "Best starting point for core concepts before moving to advanced books or current-affairs integration.",
+        "topics": ["foundation", "history", "geography", "science", "economy", "environment", "society"],
+    },
+    {
+        "title": "Press Information Bureau",
+        "url": "https://pib.gov.in",
+        "provider": "official",
+        "bucket": "Official source",
+        "tags": ["Current affairs", "Government source"],
+        "use_case": "Use for authentic current-affairs notes and examples, especially for mains enrichment and interview balance.",
+        "topics": ["current affairs", "governance", "economy", "international relations", "interview", "mains"],
+    },
+    {
+        "title": "PRS Legislative Research",
+        "url": "https://prsindia.org",
+        "provider": "research",
+        "bucket": "Deep study",
+        "tags": ["Governance", "Bills", "Analysis"],
+        "use_case": "Excellent for governance, policy, Parliament, and issue-based mains answers with clarity and structure.",
+        "topics": ["polity", "governance", "constitution", "social justice", "international relations", "mains"],
+    },
+    {
+        "title": "Ministry of Environment, Forest and Climate Change",
+        "url": "https://moef.gov.in",
+        "provider": "official",
+        "bucket": "Official source",
+        "tags": ["Environment", "Official"],
+        "use_case": "Useful for environment, biodiversity, schemes, conventions, and current updates.",
+        "topics": ["environment", "ecology", "prelims", "mains"],
+    },
+    {
+        "title": "Reserve Bank of India Publications",
+        "url": "https://www.rbi.org.in",
+        "provider": "official",
+        "bucket": "Deep study",
+        "tags": ["Economy", "Official"],
+        "use_case": "Use to strengthen economy basics, monetary policy understanding, and mains examples.",
+        "topics": ["economy", "budget", "banking", "prelims", "mains"],
+    },
+    {
+        "title": "India Year Book and Government Portals",
+        "url": "https://www.india.gov.in",
+        "provider": "official",
+        "bucket": "Quick revision",
+        "tags": ["Schemes", "Government", "Revision"],
+        "use_case": "Helpful for quick government facts, ministries, schemes, and factual brushing up.",
+        "topics": ["governance", "social justice", "schemes", "interview", "revision"],
+    },
+    {
+        "title": "ISRO Official Website",
+        "url": "https://www.isro.gov.in",
+        "provider": "official",
+        "bucket": "Official source",
+        "tags": ["Science and Tech", "Official"],
+        "use_case": "Strong source for science and tech examples, space updates, and interview-ready factual grounding.",
+        "topics": ["science", "technology", "prelims", "mains", "interview"],
+    },
+    {
+        "title": "NITI Aayog Reports",
+        "url": "https://www.niti.gov.in",
+        "provider": "official",
+        "bucket": "Deep study",
+        "tags": ["Policy", "Development", "Mains"],
+        "use_case": "Useful for policy framing, statistics, reforms, and value-added mains examples.",
+        "topics": ["economy", "governance", "social justice", "agriculture", "mains", "essay"],
+    },
+    {
+        "title": "Ministry of External Affairs",
+        "url": "https://www.mea.gov.in",
+        "provider": "official",
+        "bucket": "Official source",
+        "tags": ["International Relations", "Official"],
+        "use_case": "Best official source for India's foreign policy positions and recent bilateral developments.",
+        "topics": ["international relations", "interview", "mains"],
+    },
+    {
+        "title": "Ethics Case Study Practice Notes",
+        "url": "https://upsc.gov.in/examination/model-question-and-answer-booklets",
+        "provider": "upsc",
+        "bucket": "Quick revision",
+        "tags": ["Ethics", "Model answers"],
+        "use_case": "Use to understand the structure and tone expected in official-style answers and case handling.",
+        "topics": ["ethics", "answer writing", "mains"],
+    },
+]
+
+UPSC_HAND_TUNED_PACKS = {
+    "foundation": {
+        "label": "Foundation and strategy pack",
+        "resources": [
+            {
+                "title": "UPSC Revised Syllabus and Scheme",
+                "url": "https://upsc.gov.in/examinations/revised-syllabus-scheme",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["Foundation", "Official", "Must use"],
+                "use_case": "Use as the master checklist before choosing books or courses.",
+            },
+            {
+                "title": "UPSC Previous Question Papers",
+                "url": "https://upsc.gov.in/examinations/previous-question-papers",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["Foundation", "PYQ", "Pattern"],
+                "use_case": "Use early to understand the exam before over-consuming resources.",
+            },
+            {
+                "title": "NCERT Textbooks Portal",
+                "url": "https://ncert.nic.in/textbook.php",
+                "provider": "ncert",
+                "bucket": "Start here",
+                "tags": ["Foundation", "Beginner"],
+                "use_case": "Best for building the conceptual base needed for both prelims and mains.",
+            },
+        ],
+    },
+    "prelims_gs": {
+        "label": "Prelims GS pack",
+        "resources": [
+            {
+                "title": "UPSC Previous Question Papers",
+                "url": "https://upsc.gov.in/examinations/previous-question-papers",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["Prelims", "PYQ", "Must use"],
+                "use_case": "Use for elimination practice and trend awareness.",
+            },
+            {
+                "title": "NCERT Textbooks Portal",
+                "url": "https://ncert.nic.in/textbook.php",
+                "provider": "ncert",
+                "bucket": "Start here",
+                "tags": ["Prelims", "Static"],
+                "use_case": "Best static base for history, geography, science, and environment.",
+            },
+            {
+                "title": "Press Information Bureau",
+                "url": "https://pib.gov.in",
+                "provider": "official",
+                "bucket": "Quick revision",
+                "tags": ["Prelims", "Current affairs"],
+                "use_case": "Use selectively for current-affairs notes tied to government action and schemes.",
+            },
+        ],
+    },
+    "csat": {
+        "label": "CSAT pack",
+        "resources": [
+            {
+                "title": "UPSC Previous Question Papers",
+                "url": "https://upsc.gov.in/examinations/previous-question-papers",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["CSAT", "PYQ"],
+                "use_case": "Practice directly from official papers to understand actual CSAT pressure.",
+            },
+            {
+                "title": "UPSC Model Question and Answer Booklets",
+                "url": "https://upsc.gov.in/examination/model-question-and-answer-booklets",
+                "provider": "upsc",
+                "bucket": "Quick revision",
+                "tags": ["CSAT", "Format"],
+                "use_case": "Useful to get comfortable with official-style presentation and response formats.",
+            },
+        ],
+    },
+    "essay": {
+        "label": "Essay pack",
+        "resources": [
+            {
+                "title": "NITI Aayog Reports",
+                "url": "https://www.niti.gov.in",
+                "provider": "official",
+                "bucket": "Deep study",
+                "tags": ["Essay", "Examples", "Policy"],
+                "use_case": "Strong source for balanced examples, policy references, and issue framing.",
+            },
+            {
+                "title": "Press Information Bureau",
+                "url": "https://pib.gov.in",
+                "provider": "official",
+                "bucket": "Quick revision",
+                "tags": ["Essay", "Current affairs"],
+                "use_case": "Useful for fresh examples and current issue angles.",
+            },
+        ],
+    },
+    "gs1": {
+        "label": "GS1 pack",
+        "resources": [
+            {
+                "title": "NCERT Textbooks Portal",
+                "url": "https://ncert.nic.in/textbook.php",
+                "provider": "ncert",
+                "bucket": "Start here",
+                "tags": ["GS1", "History", "Geography"],
+                "use_case": "Best base for culture, society, history, and geography preparation.",
+            },
+            {
+                "title": "UPSC Previous Question Papers",
+                "url": "https://upsc.gov.in/examinations/previous-question-papers",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["GS1", "PYQ"],
+                "use_case": "Use to understand how UPSC frames GS1 themes and answer demand.",
+            },
+        ],
+    },
+    "gs2": {
+        "label": "GS2 pack",
+        "resources": [
+            {
+                "title": "PRS Legislative Research",
+                "url": "https://prsindia.org",
+                "provider": "research",
+                "bucket": "Deep study",
+                "tags": ["GS2", "Governance", "Bills"],
+                "use_case": "Excellent for governance, Parliament, federalism, and policy analysis.",
+            },
+            {
+                "title": "Ministry of External Affairs",
+                "url": "https://www.mea.gov.in",
+                "provider": "official",
+                "bucket": "Official source",
+                "tags": ["GS2", "IR", "Official"],
+                "use_case": "Best official reference for international relations and foreign policy issues.",
+            },
+            {
+                "title": "India Year Book and Government Portals",
+                "url": "https://www.india.gov.in",
+                "provider": "official",
+                "bucket": "Quick revision",
+                "tags": ["GS2", "Schemes", "Government"],
+                "use_case": "Useful for ministries, schemes, and quick factual support.",
+            },
+        ],
+    },
+    "gs3": {
+        "label": "GS3 pack",
+        "resources": [
+            {
+                "title": "Reserve Bank of India Publications",
+                "url": "https://www.rbi.org.in",
+                "provider": "official",
+                "bucket": "Deep study",
+                "tags": ["GS3", "Economy", "Official"],
+                "use_case": "Strong source for economy, monetary policy, inflation, and banking.",
+            },
+            {
+                "title": "Ministry of Environment, Forest and Climate Change",
+                "url": "https://moef.gov.in",
+                "provider": "official",
+                "bucket": "Official source",
+                "tags": ["GS3", "Environment", "Official"],
+                "use_case": "Use for environment, conventions, biodiversity, and policy updates.",
+            },
+            {
+                "title": "ISRO Official Website",
+                "url": "https://www.isro.gov.in",
+                "provider": "official",
+                "bucket": "Official source",
+                "tags": ["GS3", "Science and Tech", "Official"],
+                "use_case": "Best for space and technology examples with factual reliability.",
+            },
+            {
+                "title": "NITI Aayog Reports",
+                "url": "https://www.niti.gov.in",
+                "provider": "official",
+                "bucket": "Deep study",
+                "tags": ["GS3", "Development", "Data points"],
+                "use_case": "Useful for reforms, agriculture, innovation, and development examples.",
+            },
+        ],
+    },
+    "gs4": {
+        "label": "GS4 ethics pack",
+        "resources": [
+            {
+                "title": "UPSC Model Question and Answer Booklets",
+                "url": "https://upsc.gov.in/examination/model-question-and-answer-booklets",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["GS4", "Ethics", "Model answers"],
+                "use_case": "Use to understand tone, structure, and expectation in official-style answers.",
+            },
+            {
+                "title": "Ethics Case Study Practice Notes",
+                "url": "https://upsc.gov.in/examination/model-question-and-answer-booklets",
+                "provider": "upsc",
+                "bucket": "Quick revision",
+                "tags": ["GS4", "Case studies"],
+                "use_case": "Good for building a quick revision loop around ethics case study handling.",
+            },
+        ],
+    },
+    "answer_writing": {
+        "label": "Answer writing pack",
+        "resources": [
+            {
+                "title": "UPSC Previous Question Papers",
+                "url": "https://upsc.gov.in/examinations/previous-question-papers",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["Answer writing", "PYQ"],
+                "use_case": "Write from actual PYQs instead of generic prompts whenever possible.",
+            },
+            {
+                "title": "UPSC Model Question and Answer Booklets",
+                "url": "https://upsc.gov.in/examination/model-question-and-answer-booklets",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["Answer writing", "Model answers"],
+                "use_case": "Best reference for structure, presentation, and clarity.",
+            },
+        ],
+    },
+    "interview": {
+        "label": "Interview pack",
+        "resources": [
+            {
+                "title": "Press Information Bureau",
+                "url": "https://pib.gov.in",
+                "provider": "official",
+                "bucket": "Official source",
+                "tags": ["Interview", "Current affairs"],
+                "use_case": "Use for authentic current-affairs grounding and balanced speaking points.",
+            },
+            {
+                "title": "Ministry of External Affairs",
+                "url": "https://www.mea.gov.in",
+                "provider": "official",
+                "bucket": "Deep study",
+                "tags": ["Interview", "IR", "Official"],
+                "use_case": "Helps build balanced and informed answers on international issues.",
+            },
+            {
+                "title": "India Year Book and Government Portals",
+                "url": "https://www.india.gov.in",
+                "provider": "official",
+                "bucket": "Quick revision",
+                "tags": ["Interview", "Government", "Facts"],
+                "use_case": "Useful for factual brushing up before mock interviews and profile questions.",
+            },
+        ],
+    },
+    "optional": {
+        "label": "Optional workflow pack",
+        "resources": [
+            {
+                "title": "UPSC Revised Syllabus and Scheme",
+                "url": "https://upsc.gov.in/examinations/revised-syllabus-scheme",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["Optional", "Official", "Must use"],
+                "use_case": "Always anchor optional preparation to the official syllabus first.",
+            },
+            {
+                "title": "UPSC Previous Question Papers",
+                "url": "https://upsc.gov.in/examinations/previous-question-papers",
+                "provider": "upsc",
+                "bucket": "Official source",
+                "tags": ["Optional", "PYQ", "Must use"],
+                "use_case": "Use PYQs to identify recurring themes and answer demand in the optional subject.",
+            },
+        ],
+    },
+}
+
 UPSC_EXAMS = [
     "Civil Services Prelims",
     "Civil Services Mains",
@@ -784,6 +1186,409 @@ def _schedule_items(items, start_date, timeline_weeks, hours_per_week, study_day
     return tasks, total_hours, current_date
 
 
+def _auto_adjust_roadmap_timeline(roadmap, start_date=None, timeline_weeks=0):
+    remaining_tasks = Task.query.filter_by(roadmap_id=roadmap.id).filter(Task.status != "done").order_by(Task.order_index.asc()).all()
+    completed_tasks = Task.query.filter_by(roadmap_id=roadmap.id, status="done").order_by(Task.order_index.asc()).all()
+
+    roadmap.completed_tasks = len(completed_tasks)
+
+    completed_hours = 0.0
+    for task in completed_tasks:
+        completed_hours += task.actual_hours if task.actual_hours and task.actual_hours > 0 else task.estimated_hours or 0.0
+
+    if not remaining_tasks:
+        last_completed = max(
+            [task.completed_at.date() for task in completed_tasks if task.completed_at],
+            default=date.today()
+        )
+        roadmap.target_date = last_completed
+        roadmap.total_hours_est = round(completed_hours, 1)
+        return
+
+    schedule_start = start_date or date.today()
+    task_specs, remaining_hours, computed_end = _schedule_items(
+        [task.title for task in remaining_tasks],
+        schedule_start,
+        timeline_weeks,
+        roadmap.hours_per_week,
+        roadmap.study_days_per_week
+    )
+
+    for task, spec in zip(remaining_tasks, task_specs):
+        task.due_date = spec["due_date"]
+        task.estimated_hours = spec["estimated_hours"]
+
+    roadmap.target_date = computed_end
+    roadmap.total_hours_est = round(completed_hours + remaining_hours, 1)
+
+
+def _build_recent_updates(roadmap):
+    updates = []
+
+    for checkin in Checkin.query.filter_by(roadmap_id=roadmap.id).order_by(Checkin.created_at.desc()).limit(8).all():
+        text_bits = []
+        if checkin.minutes:
+            text_bits.append(f"{checkin.minutes} minutes logged")
+        if checkin.note:
+            text_bits.append(checkin.note)
+        updates.append({
+            "kind": "checkin",
+            "title": "Progress update",
+            "body": " - ".join(text_bits) if text_bits else "Study session logged",
+            "when": checkin.created_at,
+        })
+
+    for task in Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.updated_at.desc()).limit(12).all():
+        if task.notes or task.status == "done":
+            body_parts = []
+            if task.status == "done":
+                body_parts.append("Marked complete")
+            elif task.status == "doing":
+                body_parts.append("In progress")
+            if task.notes:
+                body_parts.append(task.notes)
+            updates.append({
+                "kind": "task",
+                "title": task.title,
+                "body": " - ".join(body_parts),
+                "when": task.updated_at,
+            })
+
+    updates.sort(key=lambda item: item["when"] or datetime.min, reverse=True)
+    return updates[:10]
+
+
+def _build_today_focus(roadmap, tasks, tests):
+    today = date.today()
+    next_task = next((task for task in tasks if task.status != "done"), None)
+    upcoming_tests = [test for test in tests if test.status != "completed" and test.scheduled_date >= today]
+    next_test = upcoming_tests[0] if upcoming_tests else None
+
+    due_soon = [task for task in tasks if task.status != "done" and task.due_date and task.due_date <= today + timedelta(days=3)]
+    revision_task = next(
+        (task for task in tasks if task.status != "done" and any(marker in _normalize(task.title) for marker in ["revision", "pyq", "answer writing", "mock", "essay"])),
+        None
+    )
+
+    return {
+        "next_task": next_task,
+        "next_test": next_test,
+        "revision_task": revision_task or next_task,
+        "due_soon_count": len(due_soon),
+    }
+
+
+def _build_week_plan(tasks, tests):
+    today = date.today()
+    week_end = today + timedelta(days=7)
+    week_tasks = [task for task in tasks if task.status != "done" and task.due_date and today <= task.due_date <= week_end][:5]
+    week_tests = [test for test in tests if today <= test.scheduled_date <= week_end][:3]
+    return {"tasks": week_tasks, "tests": week_tests}
+
+
+def _build_resource_groups(resources):
+    groups = {
+        "Start here": [],
+        "Official source": [],
+        "Deep study": [],
+        "Quick revision": [],
+    }
+
+    for res in resources:
+        provider = ((res.get("provider") if isinstance(res, dict) else res.provider) or "").lower()
+        title = _normalize((res.get("title") if isinstance(res, dict) else res.title) or "")
+        summary = _normalize((res.get("summary") if isinstance(res, dict) else res.summary) or "")
+
+        if provider in {"upsc", "official", "ncert"}:
+            target = "Official source"
+        elif any(marker in title or marker in summary for marker in ["summary", "outline", "quick", "revision", "notes"]):
+            target = "Quick revision"
+        elif provider in {"crossref", "research"} or any(marker in title for marker in ["analysis", "advanced", "deep"]):
+            target = "Deep study"
+        else:
+            target = "Start here"
+        groups[target].append(res)
+
+    ordered = []
+    for label in ["Start here", "Official source", "Deep study", "Quick revision"]:
+        if groups[label]:
+            ordered.append({"label": label, "resources": groups[label][:3]})
+    return ordered
+
+
+def _resource_topic_markers(task_title, optional_subject=""):
+    title = _normalize(task_title)
+    markers = set()
+
+    mapping = {
+        "strategy": ["strategy", "planning", "foundation", "attempt", "timeline"],
+        "foundation": ["ncert", "foundation", "basic", "build-up"],
+        "current affairs": ["current affairs", "news", "notes"],
+        "polity": ["polity", "constitution", "parliament", "judiciary", "federalism", "governance"],
+        "history": ["history", "freedom struggle", "heritage", "culture", "world history"],
+        "geography": ["geography", "physical", "human"],
+        "economy": ["economy", "budget", "banking", "agriculture"],
+        "environment": ["environment", "ecology", "biodiversity"],
+        "science": ["science", "technology", "space"],
+        "international relations": ["international relations", "foreign policy"],
+        "social justice": ["social justice", "society", "welfare"],
+        "ethics": ["ethics", "integrity", "case study"],
+        "essay": ["essay"],
+        "csat": ["csat", "reasoning", "numeracy", "comprehension", "aptitude"],
+        "pyq": ["pyq", "previous year"],
+        "answer writing": ["answer writing", "time-bound answer", "mains enrichment"],
+        "interview": ["interview", "daf", "panel", "communication", "personality"],
+        "mains": ["mains", "general studies"],
+        "prelims": ["prelims"],
+        "revision": ["revision", "mock", "test"],
+        "optional": ["optional subject"],
+    }
+
+    for topic_key, keywords in mapping.items():
+        if any(keyword in title for keyword in keywords):
+            markers.add(topic_key)
+
+    if optional_subject and "optional subject" in title:
+        markers.add("optional")
+    if not markers:
+        markers.update({"strategy", "foundation"})
+    return markers
+
+
+def _subject_pack_keys_for_task(task_markers):
+    keys = []
+    if {"strategy", "foundation"} & task_markers:
+        keys.append("foundation")
+    if {"prelims", "polity", "history", "geography", "economy", "environment", "science", "pyq"} & task_markers:
+        keys.append("prelims_gs")
+    if "csat" in task_markers:
+        keys.append("csat")
+    if "essay" in task_markers:
+        keys.append("essay")
+    if {"history", "geography", "society"} & task_markers:
+        keys.append("gs1")
+    if {"polity", "governance", "international relations", "social justice"} & task_markers:
+        keys.append("gs2")
+    if {"economy", "environment", "science", "technology"} & task_markers:
+        keys.append("gs3")
+    if "ethics" in task_markers:
+        keys.append("gs4")
+    if {"answer writing", "mains"} & task_markers:
+        keys.append("answer_writing")
+    if "interview" in task_markers:
+        keys.append("interview")
+    if "optional" in task_markers:
+        keys.append("optional")
+
+    unique = []
+    seen = set()
+    for key in keys:
+        if key not in seen:
+            seen.add(key)
+            unique.append(key)
+    return unique
+
+
+def _score_curated_resource(task_markers, resource):
+    resource_topics = set(resource.get("topics", []))
+    overlap = len(task_markers & resource_topics)
+    base = 0
+    if resource.get("bucket") == "Official source":
+        base += 40
+    elif resource.get("bucket") == "Start here":
+        base += 30
+    elif resource.get("bucket") == "Deep study":
+        base += 20
+    else:
+        base += 15
+    if "Must use" in resource.get("tags", []):
+        base += 15
+    if "Official" in resource.get("tags", []):
+        base += 10
+    return base + (overlap * 18)
+
+
+def _curated_upsc_resources_for_task(task_title, optional_subject=""):
+    task_markers = _resource_topic_markers(task_title, optional_subject)
+    pack_keys = _subject_pack_keys_for_task(task_markers)
+
+    selected = []
+    seen_urls = set()
+
+    for pack_key in pack_keys:
+        pack = UPSC_HAND_TUNED_PACKS.get(pack_key)
+        if not pack:
+            continue
+        for item in pack["resources"]:
+            entry = dict(item)
+            entry["tags"] = list(dict.fromkeys(entry.get("tags", []) + [pack["label"]]))
+            if entry["url"] not in seen_urls:
+                selected.append(entry)
+                seen_urls.add(entry["url"])
+
+    ranked = sorted(
+        UPSC_CURATED_RESOURCES,
+        key=lambda item: _score_curated_resource(task_markers, item),
+        reverse=True
+    )
+
+    for item in ranked:
+        if item["url"] in seen_urls:
+            continue
+        if len(selected) >= 8:
+            break
+        selected.append(item)
+        seen_urls.add(item["url"])
+
+    if optional_subject and any(marker in task_markers for marker in {"optional", "mains"}):
+        selected.append({
+            "title": f"Optional subject syllabus anchor: {optional_subject}",
+            "url": "https://upsc.gov.in/examinations/revised-syllabus-scheme",
+            "provider": "upsc",
+            "bucket": "Official source",
+            "tags": ["Optional", "Official"],
+            "use_case": f"Use this as the official syllabus anchor before collecting books or notes for {optional_subject}.",
+            "topics": ["optional", "mains"],
+        })
+
+    unique = []
+    seen = set()
+    for item in selected:
+        if item["url"] in seen:
+            continue
+        seen.add(item["url"])
+        unique.append(item)
+    return unique
+
+
+def _annotate_resource(resource):
+    curated_match = next((item for item in UPSC_CURATED_RESOURCES if item["url"] == resource.url or item["title"] == resource.title), None)
+    bucket = "Start here"
+    tags = ["Useful"]
+    use_case = resource.summary or "Open this resource and pull out notes, examples, and revisions relevant to the task."
+
+    if curated_match:
+        bucket = curated_match.get("bucket", bucket)
+        tags = curated_match.get("tags", tags)
+        use_case = curated_match.get("use_case", use_case)
+    else:
+        provider = (resource.provider or "").lower()
+        if provider in {"upsc", "official", "ncert"}:
+            bucket = "Official source"
+            tags = ["Official"]
+        elif provider in {"research", "crossref"}:
+            bucket = "Deep study"
+            tags = ["Deep study"]
+        elif "summary" in _normalize(resource.summary or ""):
+            bucket = "Quick revision"
+            tags = ["Revision"]
+
+    return {
+        "id": resource.id,
+        "provider": resource.provider,
+        "title": resource.title,
+        "url": resource.url,
+        "summary": resource.summary,
+        "rating_avg": resource.rating_avg,
+        "rating_count": resource.rating_count,
+        "flagged_count": resource.flagged_count,
+        "bucket": bucket,
+        "tags": tags,
+        "use_case": use_case,
+    }
+
+
+def _resource_use_case(resource, group_label):
+    if group_label == "Official source":
+        return "Best for syllabus accuracy, PYQs, and exam rules."
+    if group_label == "Deep study":
+        return "Best when you want deeper conceptual understanding and examples."
+    if group_label == "Quick revision":
+        return "Best for fast recap before revision or tests."
+    return "Best starting point if you are learning this block for the first time."
+
+
+def _build_milestones(roadmap, tasks, tests, done_map=None, attempts=None):
+    total_tasks = len(tasks) or 1
+    done_tasks = len([task for task in tasks if task.status == "done"])
+    milestones = [
+        {
+            "title": "First step completed",
+            "done": done_tasks >= 1,
+            "detail": "Builds early momentum.",
+        },
+        {
+            "title": "25% plan completed",
+            "done": done_tasks / total_tasks >= 0.25,
+            "detail": f"{done_tasks}/{len(tasks)} tasks finished.",
+        },
+        {
+            "title": "Halfway milestone",
+            "done": done_tasks / total_tasks >= 0.5,
+            "detail": "A strong sign your system is working.",
+        },
+        {
+            "title": "Mock test rhythm started",
+            "done": len([test for test in tests if test.status == "completed"]) >= 1,
+            "detail": "Completed tests improve exam readiness.",
+        },
+    ]
+
+    if roadmap.roadmap_type == "upsc":
+        pyq_count = sum(len(years) for years in (done_map or {}).values())
+        avg_attempt = 0.0
+        if attempts:
+            avg_attempt = round(sum(attempt.score for attempt in attempts.values()) / max(len(attempts), 1), 1)
+        milestones.extend([
+            {
+                "title": "PYQ habit building",
+                "done": pyq_count >= 5,
+                "detail": f"{pyq_count} PYQ years marked complete.",
+            },
+            {
+                "title": "Answer writing consistency",
+                "done": avg_attempt >= 3.5 and len(attempts or {}) >= 5,
+                "detail": f"Average self-score: {avg_attempt}/5.",
+            },
+        ])
+    return milestones
+
+
+def _extract_optional_subject_from_source_text(source_text):
+    match = re.search(r"Optional Subject:\s*(.+)", source_text or "", flags=re.IGNORECASE)
+    if not match:
+        return ""
+    return match.group(1).strip()
+
+
+def _build_readiness_metrics(roadmap, tasks, tests, done_map=None, attempts=None, quiz_results=None):
+    total_tasks = len(tasks) or 1
+    done_ratio = len([task for task in tasks if task.status == "done"]) / total_tasks
+    completed_tests = [test for test in tests if test.status == "completed"]
+    test_ratio = len(completed_tests) / max(len(tests), 1)
+    pyq_total = sum(len(years) for years in (done_map or {}).values())
+    pyq_ratio = min(pyq_total / 10, 1.0)
+    answer_ratio = 0.0
+    if attempts:
+        answer_ratio = min((sum(attempt.score for attempt in attempts.values()) / (5 * max(len(attempts), 1))), 1.0)
+    quiz_ratio = 0.0
+    if quiz_results:
+        avg_accuracy = sum((result.correct / max(result.total_questions, 1)) for result in quiz_results) / len(quiz_results)
+        quiz_ratio = min(avg_accuracy, 1.0)
+
+    if roadmap.roadmap_type == "upsc":
+        prelims = round((done_ratio * 0.3 + test_ratio * 0.3 + pyq_ratio * 0.25 + quiz_ratio * 0.15) * 100)
+        mains = round((done_ratio * 0.35 + answer_ratio * 0.35 + test_ratio * 0.2 + pyq_ratio * 0.1) * 100)
+        interview = round((done_ratio * 0.4 + test_ratio * 0.2 + answer_ratio * 0.2 + quiz_ratio * 0.2) * 100)
+        return [
+            {"label": "Prelims readiness", "value": prelims, "hint": "Built from tasks, PYQs, tests, and quiz accuracy."},
+            {"label": "Mains readiness", "value": mains, "hint": "Built from answer writing, test work, and study progress."},
+            {"label": "Interview readiness", "value": interview, "hint": "Built from consistency and communication-oriented preparation."},
+        ]
+    overall = round((done_ratio * 0.6 + test_ratio * 0.25 + answer_ratio * 0.15) * 100)
+    return [{"label": "Plan readiness", "value": overall, "hint": "Built from task completion, tests, and progress quality."}]
+
+
 def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week):
     all_items = topics[:]
     if roadmap_type in {"career", "upsc"}:
@@ -1056,13 +1861,14 @@ def create_upsc_roadmap():
                             provider=res["provider"],
                             title=res["title"],
                             url=res["url"],
-                            summary="Curated UPSC resource",
+                            summary=res.get("use_case", "Curated UPSC resource"),
                             score=0.95,
                             task_id=task.id
                         ))
                 for spec in _build_upsc_test_plan(start_date, target_date, upsc_focus):
                     db.session.add(MockTestSchedule(
                         title=spec["title"],
+                        test_type=spec["test_type"],
                         scheduled_date=spec["scheduled_date"],
                         duration_minutes=spec["duration_minutes"],
                         questions_count=spec["questions_count"],
@@ -1099,13 +1905,29 @@ def view_roadmap(roadmap_id):
     forecast = _calculate_forecast(roadmap)
     last_checkin = roadmap.last_checkin_date.strftime("%Y-%m-%d") if roadmap.last_checkin_date else "None"
     resources_map = {}
+    annotated_resources_map = {}
     for task in tasks:
         resources_map[task.id] = sorted(
             task.resources,
             key=lambda r: (-(r.rating_avg + r.score), r.flagged_count)
         )
+        annotated_resources_map[task.id] = [_annotate_resource(item) for item in resources_map[task.id]]
     tests = MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).order_by(MockTestSchedule.scheduled_date.asc()).all()
     upsc_buckets = _build_upsc_dashboard_data(tasks, tests) if roadmap.roadmap_type == "upsc" else []
+    recent_updates = _build_recent_updates(roadmap)
+    done_map = {}
+    attempts = {}
+    quiz_results = []
+    if roadmap.roadmap_type == "upsc":
+        for c in PyqCompletion.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).all():
+            done_map.setdefault(c.exam, []).append(c.year)
+        attempts = {a.question_id: a for a in QuestionAttempt.query.filter_by(user_id=session['user_id']).all()}
+        quiz_results = QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
+    today_focus = _build_today_focus(roadmap, tasks, tests)
+    week_plan = _build_week_plan(tasks, tests)
+    resource_groups_map = {task.id: _build_resource_groups(annotated_resources_map.get(task.id, [])) for task in tasks}
+    milestones = _build_milestones(roadmap, tasks, tests, done_map, attempts)
+    readiness_metrics = _build_readiness_metrics(roadmap, tasks, tests, done_map, attempts, quiz_results)
     return render_template(
         'roadmap_view.html',
         roadmap=roadmap,
@@ -1114,8 +1936,15 @@ def view_roadmap(roadmap_id):
         forecast=forecast,
         last_checkin=last_checkin,
         resources_map=resources_map,
+        annotated_resources_map=annotated_resources_map,
+        resource_groups_map=resource_groups_map,
         tests=tests,
-        upsc_buckets=upsc_buckets
+        upsc_buckets=upsc_buckets,
+        recent_updates=recent_updates,
+        today_focus=today_focus,
+        week_plan=week_plan,
+        milestones=milestones,
+        readiness_metrics=readiness_metrics
     )
 
 
@@ -1170,7 +1999,10 @@ def update_task_status(roadmap_id, task_id):
 
     if new_status == "done":
         task.completed_at = datetime.utcnow()
-    roadmap.completed_tasks = Task.query.filter_by(roadmap_id=roadmap.id, status="done").count()
+    elif new_status != "done":
+        task.completed_at = None
+
+    _auto_adjust_roadmap_timeline(roadmap)
     db.session.commit()
     if new_status == "done":
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id, celebrate=1, _anchor=f"task-{task.id}"))
@@ -1192,7 +2024,28 @@ def practice(roadmap_id):
     done_map = {}
     for c in completions:
         done_map.setdefault(c.exam, []).append(c.year)
-    return render_template("practice.html", roadmap=roadmap, questions=questions, attempts=attempts, years=years, exams=UPSC_EXAMS, done_map=done_map)
+    pyq_total = sum(len(items) for items in done_map.values())
+    avg_score = round(sum(a.score for a in attempts.values()) / max(len(attempts), 1), 1) if attempts else 0.0
+    readiness_metrics = _build_readiness_metrics(
+        roadmap,
+        Task.query.filter_by(roadmap_id=roadmap.id).all(),
+        MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).all(),
+        done_map,
+        attempts,
+        QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
+    )
+    return render_template(
+        "practice.html",
+        roadmap=roadmap,
+        questions=questions,
+        attempts=attempts,
+        years=years,
+        exams=UPSC_EXAMS,
+        done_map=done_map,
+        pyq_total=pyq_total,
+        avg_score=avg_score,
+        readiness_metrics=readiness_metrics
+    )
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/quiz', methods=['GET'])
@@ -1201,11 +2054,16 @@ def quiz(roadmap_id):
     roadmap = Roadmap.query.get_or_404(roadmap_id)
     if roadmap.user_id != session['user_id']:
         return redirect(url_for('dashboard.dashboard'))
-    questions = _fetch_opentdb_questions(amount=10, difficulty="medium")
+    amount = _safe_int(request.args.get("amount", 10), 10, 5, 20)
+    difficulty = request.args.get("difficulty", "medium")
+    if difficulty not in {"easy", "medium", "hard"}:
+        difficulty = "medium"
+    questions = _fetch_opentdb_questions(amount=amount, difficulty=difficulty)
     if not questions:
         flash("Quiz generator is busy. Try again in a minute.")
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
-    return render_template("quiz.html", roadmap=roadmap, questions=questions)
+    recent_results = QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
+    return render_template("quiz.html", roadmap=roadmap, questions=questions, recent_results=recent_results, selected_amount=amount, selected_difficulty=difficulty)
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/quiz/submit', methods=['POST'])
@@ -1227,6 +2085,7 @@ def quiz_submit(roadmap_id):
         else:
             incorrect += 1
     score = (correct * 2) - (incorrect * (2 / 3))
+    accuracy = round((correct / max(total, 1)) * 100, 2)
     result = QuizResult(
         total_questions=total,
         correct=correct,
@@ -1237,7 +2096,18 @@ def quiz_submit(roadmap_id):
     )
     db.session.add(result)
     db.session.commit()
-    return render_template("quiz_result.html", roadmap=roadmap, result=result)
+    analysis = []
+    if accuracy >= 75:
+        analysis.append("Strong quiz performance. Keep test rhythm steady and keep revising weak pockets.")
+    elif accuracy >= 50:
+        analysis.append("Moderate performance. Revision and more PYQ-based testing will improve accuracy.")
+    else:
+        analysis.append("This score suggests you should slow down, revise, and retest after consolidating basics.")
+    if incorrect > correct:
+        analysis.append("Too many risky attempts. Work on elimination and selective answering.")
+    if correct < max(total // 2, 4):
+        analysis.append("Focus on concept revision before the next test instead of adding too many new topics.")
+    return render_template("quiz_result.html", roadmap=roadmap, result=result, accuracy=accuracy, analysis=analysis)
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/pyq', methods=['POST'])
@@ -1271,18 +2141,24 @@ def schedule_test(roadmap_id):
     if roadmap.user_id != session['user_id']:
         return redirect(url_for('dashboard.dashboard'))
     title = request.form.get("title", "Mock Test")
+    test_type = request.form.get("test_type", "mock")
+    if test_type not in {"diagnostic", "sectional", "full_length", "revision", "essay", "interview", "mock"}:
+        test_type = "mock"
     date_str = request.form.get("scheduled_date")
     duration = int(request.form.get("duration_minutes", 90) or 90)
     qcount = int(request.form.get("questions_count", 50) or 50)
+    notes = request.form.get("notes", "").strip() or None
     try:
         scheduled_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except Exception:
         scheduled_date = datetime.utcnow().date()
     test = MockTestSchedule(
         title=title,
+        test_type=test_type,
         scheduled_date=scheduled_date,
         duration_minutes=duration,
         questions_count=qcount,
+        notes=notes,
         roadmap_id=roadmap.id
     )
     db.session.add(test)
@@ -1301,6 +2177,13 @@ def update_test_status(roadmap_id, test_id):
     if status not in ["planned", "completed", "missed"]:
         status = "planned"
     test.status = status
+    score_val = request.form.get("score", "").strip()
+    if score_val:
+        try:
+            test.score = float(score_val)
+        except ValueError:
+            pass
+    test.notes = request.form.get("notes", "").strip() or test.notes
     db.session.commit()
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
@@ -1397,6 +2280,7 @@ def checkin(roadmap_id):
     checkin = Checkin(checkin_date=today, minutes=minutes, note=note, roadmap_id=roadmap.id)
     db.session.add(checkin)
     _update_streak(roadmap, today)
+    _auto_adjust_roadmap_timeline(roadmap)
     db.session.commit()
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
@@ -1415,14 +2299,17 @@ def refresh_resources(roadmap_id, task_id):
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
     Resource.query.filter_by(task_id=task.id).delete()
-    resources = _fetch_resources_for_topic(task.title.replace("Project: ", ""))
+    if roadmap.roadmap_type == "upsc":
+        resources = _curated_upsc_resources_for_task(task.title, _extract_optional_subject_from_source_text(roadmap.source_text))
+    else:
+        resources = _fetch_resources_for_topic(task.title.replace("Project: ", ""))
     for res in resources:
         db.session.add(Resource(
             provider=res["provider"],
             title=res["title"],
             url=res["url"],
-            summary=res.get("summary", ""),
-            score=res.get("score", 0.0),
+            summary=res.get("use_case") or res.get("summary", ""),
+            score=res.get("score", 0.95 if roadmap.roadmap_type == "upsc" else 0.0),
             task_id=task.id
         ))
     task.last_resource_refresh = datetime.utcnow()
@@ -1518,24 +2405,8 @@ def rebalance(roadmap_id):
     if not remaining_tasks:
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
-    start_date = datetime.utcnow().date()
     timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
-    titles = [t.title for t in remaining_tasks]
-    task_specs, total_hours, computed_end = _schedule_items(
-        titles,
-        start_date,
-        timeline_weeks,
-        roadmap.hours_per_week,
-        roadmap.study_days_per_week
-    )
-    for idx, spec in enumerate(task_specs):
-        if idx >= len(remaining_tasks):
-            break
-        task = remaining_tasks[idx]
-        task.due_date = spec["due_date"]
-        task.estimated_hours = spec["estimated_hours"]
-    roadmap.target_date = computed_end
-    roadmap.total_hours_est = total_hours
+    _auto_adjust_roadmap_timeline(roadmap, start_date=datetime.utcnow().date(), timeline_weeks=timeline_weeks)
     db.session.commit()
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
@@ -1609,28 +2480,7 @@ def _build_upsc_subject_plan(selected_subjects, optional_subject="", focus="full
 
 
 def _upsc_resources_for_task(task_title, optional_subject=""):
-    title = _normalize(task_title)
-    picks = list(UPSC_RESOURCES[:4])
-    if "current affairs" in title:
-        picks.append(UPSC_RESOURCES[4])
-    if "polity" in title or "governance" in title or "constitution" in title:
-        picks.append(UPSC_RESOURCES[5])
-    if "ncert" in title or "history" in title or "geography" in title or "science" in title:
-        picks.append(UPSC_RESOURCES[6])
-    if optional_subject and "optional subject" in title:
-        picks.append({
-            "title": f"Optional subject reading plan: {optional_subject}",
-            "url": "https://upsc.gov.in/examinations/revised-syllabus-scheme",
-            "provider": "upsc",
-        })
-    unique = []
-    seen = set()
-    for item in picks:
-        key = item["url"]
-        if key not in seen:
-            seen.add(key)
-            unique.append(item)
-    return unique
+    return _curated_upsc_resources_for_task(task_title, optional_subject)
 
 
 def _build_upsc_test_plan(start_date, target_date, focus="full_journey"):
@@ -1665,8 +2515,21 @@ def _build_upsc_test_plan(start_date, target_date, focus="full_journey"):
 
     for ratio, label in zip(checkpoints, labels):
         scheduled_date = start_date + timedelta(days=max(7, math.floor(total_days * ratio)))
+        if focus == "interview":
+            test_type = "interview"
+        elif "Essay" in label:
+            test_type = "essay"
+        elif "Diagnostic" in label:
+            test_type = "diagnostic"
+        elif "Sectional" in label:
+            test_type = "sectional"
+        elif "Revision" in label:
+            test_type = "revision"
+        else:
+            test_type = "full_length"
         tests.append({
             "title": label,
+            "test_type": test_type,
             "scheduled_date": min(scheduled_date, target_date),
             "duration_minutes": 120 if focus != "interview" else 45,
             "questions_count": 100 if "Prelims" in label or "CSAT" in label else 20 if focus == "interview" else 25,

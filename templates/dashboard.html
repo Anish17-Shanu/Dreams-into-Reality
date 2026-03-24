@@ -2,13 +2,32 @@
 {% block content %}
 <section class="hero">
     <div>
-        <h1>Welcome back, {{ user.email }}</h1>
-        <p class="muted">Your dreams left you a note: "Let's do this today."</p>
+        <span class="pill">My plans</span>
+        <h1>Welcome back</h1>
+        <p class="muted">Pick up where you left off, open an existing plan, or create a new one.</p>
     </div>
     <div class="hero-actions">
-        <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Launch a Dream</a>
+        <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Create Study or Career Plan</a>
         <a class="ghost" href="{{ url_for('dashboard.create_upsc_roadmap') }}">UPSC Mission</a>
     </div>
+</section>
+
+<section class="grid grid-3 compact-grid">
+    <article class="card summary-card">
+        <p class="eyebrow">Account</p>
+        <h3>{{ user.email }}</h3>
+        <p class="muted">Signed in and ready to continue.</p>
+    </article>
+    <article class="card summary-card">
+        <p class="eyebrow">Total plans</p>
+        <h3>{{ roadmaps|length }}</h3>
+        <p class="muted">Everything you are currently tracking.</p>
+    </article>
+    <article class="card summary-card">
+        <p class="eyebrow">Next step</p>
+        <h3>{% if roadmaps %}Open a plan{% else %}Create your first plan{% endif %}</h3>
+        <p class="muted">{% if roadmaps %}Choose one card below to continue.{% else %}Start with a syllabus, career goal, or UPSC mission.{% endif %}</p>
+    </article>
 </section>
 
 <section class="grid">
@@ -20,15 +39,16 @@
                     <span class="pill">{{ 'UPSC' if roadmap.roadmap_type == 'upsc' else roadmap.roadmap_type|capitalize }}</span>
                 </div>
                 <p class="muted">Timeline: {{ roadmap.start_date }} to {{ roadmap.target_date }}</p>
+                <p class="muted">Completed: {{ roadmap.completed_tasks }} of {{ roadmap.total_tasks }} tasks</p>
                 <div class="progress-row">
                     <div class="progress">
                         {% set pct = (roadmap.completed_tasks / roadmap.total_tasks * 100) if roadmap.total_tasks else 0 %}
                         <div class="progress-bar" style="width: {{ pct }}%"></div>
                     </div>
-                    <span>{{ roadmap.completed_tasks }}/{{ roadmap.total_tasks }}</span>
+                    <span>{{ pct|round(0) }}%</span>
                 </div>
                 <div class="card-actions">
-                    <a href="{{ url_for('dashboard.view_roadmap', roadmap_id=roadmap.id) }}">Open</a>
+                    <a class="primary-link" href="{{ url_for('dashboard.view_roadmap', roadmap_id=roadmap.id) }}">Open plan</a>
                     <form method="POST" action="{{ url_for('dashboard.delete_roadmap', roadmap_id=roadmap.id) }}">
                         <button class="ghost" type="submit">Delete</button>
                     </form>
@@ -37,11 +57,11 @@
         {% endfor %}
     {% else %}
         <div class="empty-state">
-            <h3>No roadmaps yet</h3>
-            <p class="muted">Add a syllabus or career dream and we will turn it into a plan.</p>
+            <h3>No plans yet</h3>
+            <p class="muted">Start with the type of help you need most right now.</p>
             <div class="hero-actions">
-                <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Create your first mission</a>
-                <a class="ghost" href="{{ url_for('dashboard.create_upsc_roadmap') }}">Build UPSC Mission</a>
+                <a class="primary" href="{{ url_for('dashboard.create_roadmap') }}">Create study or career plan</a>
+                <a class="ghost" href="{{ url_for('dashboard.create_upsc_roadmap') }}">Create UPSC mission</a>
             </div>
         </div>
     {% endif %}

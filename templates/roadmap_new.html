@@ -2,26 +2,40 @@
 {% block content %}
 <section class="panel">
     <div>
-        <h1>Craft a Dream Map</h1>
-        <p class="muted">Drop a syllabus or a career dream. We’ll turn it into a playful, achievable timeline.</p>
+        <span class="pill">Create a plan</span>
+        <h1>Build a simple study or career plan</h1>
+        <p class="muted">Tell us what you want to learn. We will turn it into a plan with clear steps and a manageable timeline.</p>
     </div>
     <form method="POST" enctype="multipart/form-data" class="stack">
+        <div class="helper-panel">
+            <h3>Best way to use this page</h3>
+            <div class="simple-list">
+                <div>
+                    <strong>Study / syllabus</strong>
+                    <p class="muted">Paste topics or upload a syllabus file.</p>
+                </div>
+                <div>
+                    <strong>Career goal</strong>
+                    <p class="muted">Type a role like "Data Analyst" or "Frontend Developer".</p>
+                </div>
+            </div>
+        </div>
         <label>
-            Roadmap title
-            <input type="text" name="title" placeholder="e.g. Data Analyst Dream Map" required>
+            Plan title
+            <input type="text" name="title" placeholder="e.g. Data Analyst Plan" required>
         </label>
         <label>
-            Roadmap type
+            Plan type
             <select name="roadmap_type">
-                <option value="syllabus">Syllabus</option>
-                <option value="career">Career</option>
+                <option value="syllabus">Study / Syllabus</option>
+                <option value="career">Career Goal</option>
             </select>
         </label>
         <label>
-            Timeline (weeks, optional)
+            Timeline in weeks (optional)
             <input type="number" name="timeline_weeks" min="0" max="52" value="0">
         </label>
-        <p class="muted">Leave timeline as 0 to auto-calculate based on your study hours.</p>
+        <p class="muted">Leave this as 0 if you want us to estimate the timeline automatically.</p>
         <div class="inline-fields">
             <label>
                 Study hours per week
@@ -37,18 +51,18 @@
             <input type="date" name="start_date">
         </label>
         <label>
-            Paste your syllabus or outline
-            <textarea name="source_text" rows="6" placeholder="Paste topics here, one per line."></textarea>
+            Paste your syllabus or goal details
+            <textarea name="source_text" rows="6" placeholder="Examples: Excel, SQL, dashboards, statistics&#10;or&#10;Unit 1: Algebra&#10;Unit 2: Calculus"></textarea>
         </label>
         <label>
-            Upload a syllabus file (PDF/TXT/DOCX/Image)
+            Upload a syllabus file if you have one
             <input type="file" name="syllabus_file" accept=".pdf,.txt,.docx,.png,.jpg,.jpeg,.bmp,.tiff">
         </label>
         <label class="inline-check">
             <input type="checkbox" name="use_ai">
-            Use AI to tidy messy syllabi
+            Clean messy syllabus text automatically
         </label>
-        <button type="submit">Generate roadmap</button>
+        <button type="submit">Create my plan</button>
     </form>
 </section>
 {% endblock %}
