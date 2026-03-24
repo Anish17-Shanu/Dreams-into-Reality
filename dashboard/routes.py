@@ -279,6 +279,29 @@ UPSC_DEFAULT_SUBJECTS_BY_FOCUS = {
 
 OPENTDB_API = "https://opentdb.com/api.php"
 
+UPSC_OFFICIAL_GUIDANCE = {
+    "full_journey": [
+        "Anchor preparation on the official UPSC syllabus, previous year papers, and exam calendar.",
+        "Split the journey into foundation, prelims accuracy, mains answer writing, and interview composure.",
+        "Keep one revision system, one PYQ tracker, and one mock-analysis loop across the full cycle.",
+    ],
+    "prelims": [
+        "Prioritize static GS coverage, CSAT safety, and elimination practice from PYQs and mocks.",
+        "Build weekly revision blocks and test-review sessions instead of only adding fresh sources.",
+        "Use official UPSC previous year papers to calibrate difficulty and trend awareness.",
+    ],
+    "mains": [
+        "Translate current affairs into issue-wise notes, examples, and answer-ready frameworks.",
+        "Train with timed answers, essay structure, ethics case studies, and value-add examples.",
+        "Review UPSC syllabus keywords and PYQs to avoid generic content drift.",
+    ],
+    "interview": [
+        "Map DAF themes, hometown, graduation, work experience, and current affairs into question banks.",
+        "Practice balanced responses, body language, and short structured speaking drills.",
+        "Keep preparation rooted in official notifications, your profile, and recent national issues.",
+    ],
+}
+
 
 def login_required(view_func):
     def wrapper(*args, **kwargs):
@@ -291,6 +314,27 @@ def login_required(view_func):
 
 def _normalize(text):
     return re.sub(r"\s+", " ", text.strip().lower())
+
+
+def _safe_int(value, default, minimum=None, maximum=None):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    if minimum is not None:
+        parsed = max(minimum, parsed)
+    if maximum is not None:
+        parsed = min(maximum, parsed)
+    return parsed
+
+
+def _safe_date(value, fallback=None):
+    if not value:
+        return fallback or datetime.utcnow().date()
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return fallback or datetime.utcnow().date()
 
 
 def _extract_topics_from_text(text):
@@ -827,121 +871,124 @@ def dashboard():
 @login_required
 def create_roadmap():
     if request.method == 'POST':
-        title = request.form.get('title', '').strip()
-        roadmap_type = request.form.get('roadmap_type', 'syllabus')
-        if roadmap_type not in {"syllabus", "career"}:
-            roadmap_type = "syllabus"
-        timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
-        timeline_weeks = max(0, min(52, timeline_weeks))
-        hours_per_week = int(request.form.get('hours_per_week', 6))
-        hours_per_week = max(1, min(40, hours_per_week))
-        study_days_per_week = int(request.form.get('study_days_per_week', 5))
-        study_days_per_week = max(1, min(7, study_days_per_week))
-        start_date_str = request.form.get('start_date')
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else datetime.utcnow().date()
+        try:
+            title = request.form.get('title', '').strip()
+            roadmap_type = request.form.get('roadmap_type', 'syllabus')
+            if roadmap_type not in {"syllabus", "career"}:
+                roadmap_type = "syllabus"
+            timeline_weeks = _safe_int(request.form.get('timeline_weeks', 0) or 0, 0, 0, 52)
+            hours_per_week = _safe_int(request.form.get('hours_per_week', 6) or 6, 6, 1, 40)
+            study_days_per_week = _safe_int(request.form.get('study_days_per_week', 5) or 5, 5, 1, 7)
+            start_date = _safe_date(request.form.get('start_date'))
 
-        raw_text = request.form.get('source_text', '').strip()
-        confirmed_topics = request.form.get('confirmed_topics', '').strip()
-        uploaded = request.files.get('syllabus_file')
-        if uploaded and uploaded.filename:
-            if not _allowed_file(uploaded.filename, {"pdf", "txt", "docx", "png", "jpg", "jpeg", "bmp", "tiff"}):
-                flash("Unsupported file type. Upload PDF, TXT, DOCX, or image files.")
-                return redirect(url_for('dashboard.create_roadmap'))
-            filename = secure_filename(uploaded.filename)
-            unique_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
-            file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_name)
-            uploaded.save(file_path)
-            ext = filename.lower()
-            if ext.endswith(".pdf"):
-                raw_text = _extract_text_from_pdf(file_path) or raw_text
-            elif ext.endswith(".docx"):
-                raw_text = _extract_text_from_docx(file_path) or raw_text
-            elif ext.endswith((".png", ".jpg", ".jpeg", ".bmp", ".tiff")):
-                raw_text = _extract_text_from_image(file_path) or raw_text
-            else:
-                try:
-                    with open(file_path, "r", encoding="utf-8") as handle:
-                        raw_text = handle.read()
-                except Exception:
-                    pass
-
-        topics = []
-        projects = []
-        use_ai = request.form.get('use_ai') == 'on'
-        if confirmed_topics:
-            topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
-        elif roadmap_type == "career":
-            key = _normalize(title)
-            match = None
-            for template_key in CAREER_TEMPLATES.keys():
-                if template_key in key:
-                    match = CAREER_TEMPLATES[template_key]
-                    break
-            if "upsc" in key:
-                topics = UPSC_TEMPLATE_TOPICS
-                projects = [
-                    "PYQ drill: last 10 years (set weekly targets)",
-                    "Mock test sprint every 2 weeks",
-                    "Optional subject deep dive"
-                ]
-                _ensure_upsc_question_bank()
-            else:
-                esco_topics = _fetch_career_template_esco(title)
-                if esco_topics:
-                    topics = esco_topics
-                    projects = [
-                        f"Build a {title} portfolio",
-                        f"{title} case study with real data",
-                        f"Showcase project: {title} mini product"
-                    ]
-                elif match:
-                    topics = match["topics"]
-                    projects = match["projects"]
+            raw_text = request.form.get('source_text', '').strip()
+            confirmed_topics = request.form.get('confirmed_topics', '').strip()
+            uploaded = request.files.get('syllabus_file')
+            if uploaded and uploaded.filename:
+                if not _allowed_file(uploaded.filename, {"pdf", "txt", "docx", "png", "jpg", "jpeg", "bmp", "tiff"}):
+                    flash("Unsupported file type. Upload PDF, TXT, DOCX, or image files.")
+                    return redirect(url_for('dashboard.create_roadmap'))
+                filename = secure_filename(uploaded.filename)
+                unique_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
+                file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_name)
+                uploaded.save(file_path)
+                ext = filename.lower()
+                if ext.endswith(".pdf"):
+                    raw_text = _extract_text_from_pdf(file_path) or raw_text
+                elif ext.endswith(".docx"):
+                    raw_text = _extract_text_from_docx(file_path) or raw_text
+                elif ext.endswith((".png", ".jpg", ".jpeg", ".bmp", ".tiff")):
+                    raw_text = _extract_text_from_image(file_path) or raw_text
                 else:
-                    topics = _extract_topics_from_text(raw_text)
-        else:
-            topics = _extract_topics_from_text(raw_text)
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as handle:
+                            raw_text = handle.read()
+                    except Exception:
+                        pass
 
-        if roadmap_type != "upsc" and (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text and not confirmed_topics:
-            ai_topics = _ai_extract_topics(raw_text)
-            if ai_topics:
-                topics = ai_topics
+            topics = []
+            projects = []
+            use_ai = request.form.get('use_ai') == 'on'
+            if confirmed_topics:
+                topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
+            elif roadmap_type == "career":
+                key = _normalize(title)
+                match = None
+                for template_key in CAREER_TEMPLATES.keys():
+                    if template_key in key:
+                        match = CAREER_TEMPLATES[template_key]
+                        break
+                if "upsc" in key:
+                    topics = UPSC_TEMPLATE_TOPICS
+                    projects = [
+                        "PYQ drill: last 10 years (set weekly targets)",
+                        "Mock test sprint every 2 weeks",
+                        "Optional subject deep dive"
+                    ]
+                    _ensure_upsc_question_bank()
+                else:
+                    esco_topics = _fetch_career_template_esco(title)
+                    if esco_topics:
+                        topics = esco_topics
+                        projects = [
+                            f"Build a {title} portfolio",
+                            f"{title} case study with real data",
+                            f"Showcase project: {title} mini product"
+                        ]
+                    elif match:
+                        topics = match["topics"]
+                        projects = match["projects"]
+                    else:
+                        topics = _extract_topics_from_text(raw_text)
+            else:
+                topics = _extract_topics_from_text(raw_text)
 
-        if roadmap_type == "syllabus" and not confirmed_topics:
-            if not topics:
-                flash("Please provide a syllabus text or upload a file with clear topics.")
+            if roadmap_type != "upsc" and (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text and not confirmed_topics:
+                ai_topics = _ai_extract_topics(raw_text)
+                if ai_topics:
+                    topics = ai_topics
+
+            if roadmap_type == "syllabus" and not confirmed_topics:
+                if not topics:
+                    flash("Please provide a syllabus text or upload a file with clear topics.")
+                    return redirect(url_for('dashboard.create_roadmap'))
+                return render_template(
+                    "roadmap_preview.html",
+                    title=title,
+                    roadmap_type=roadmap_type,
+                    timeline_weeks=timeline_weeks,
+                    hours_per_week=hours_per_week,
+                    study_days_per_week=study_days_per_week,
+                    start_date=start_date,
+                    raw_text=raw_text,
+                    topics="\n".join(topics),
+                    original_topics=topics
+                )
+
+            if not title:
+                title = "Dream Roadmap"
+            if not topics and roadmap_type == "syllabus":
+                flash("Please provide a syllabus text or upload a file with topics.")
                 return redirect(url_for('dashboard.create_roadmap'))
-            return render_template(
-                "roadmap_preview.html",
-                title=title,
-                roadmap_type=roadmap_type,
-                timeline_weeks=timeline_weeks,
-                hours_per_week=hours_per_week,
-                study_days_per_week=study_days_per_week,
-                start_date=start_date,
-                raw_text=raw_text,
-                topics="\n".join(topics),
-                original_topics=topics
-            )
 
-        if not title:
-            title = "Dream Roadmap"
-        if not topics and roadmap_type == "syllabus":
-            flash("Please provide a syllabus text or upload a file with topics.")
+            roadmap, task_ids, auto_fetch, _ = _persist_roadmap(
+                roadmap_type, title, raw_text, topics, projects, start_date, timeline_weeks,
+                hours_per_week, study_days_per_week
+            )
+            if auto_fetch:
+                thread = threading.Thread(
+                    target=_background_fetch_resources,
+                    args=(current_app._get_current_object(), roadmap.id),
+                    daemon=True
+                )
+                thread.start()
+            flash("Roadmap generated successfully.")
+            return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Failed to create roadmap")
+            flash("We couldn't generate that roadmap right now. Please try again with cleaner input.")
             return redirect(url_for('dashboard.create_roadmap'))
-
-        roadmap, task_ids, auto_fetch, _ = _persist_roadmap(
-            roadmap_type, title, raw_text, topics, projects, start_date, timeline_weeks,
-            hours_per_week, study_days_per_week
-        )
-        if auto_fetch:
-            thread = threading.Thread(
-                target=_background_fetch_resources,
-                args=(current_app._get_current_object(), roadmap.id),
-                daemon=True
-            )
-            thread.start()
-        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
     return render_template('roadmap_new.html')
 
@@ -950,87 +997,93 @@ def create_roadmap():
 @login_required
 def create_upsc_roadmap():
     if request.method == 'POST':
-        title = request.form.get('title', '').strip() or "UPSC Mission"
-        timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
-        timeline_weeks = max(0, min(52, timeline_weeks))
-        hours_per_week = int(request.form.get('hours_per_week', 6))
-        hours_per_week = max(1, min(40, hours_per_week))
-        study_days_per_week = int(request.form.get('study_days_per_week', 5))
-        study_days_per_week = max(1, min(7, study_days_per_week))
-        upsc_focus = request.form.get('upsc_focus', 'full_journey').strip() or "full_journey"
-        upsc_optional_subject = request.form.get('upsc_optional_subject', '').strip()
-        upsc_subjects = request.form.getlist('upsc_subjects')
-        if not upsc_subjects:
-            serialized_subjects = request.form.get('selected_upsc_subjects', '').strip()
-            if serialized_subjects:
-                upsc_subjects = [item.strip() for item in serialized_subjects.split(",") if item.strip()]
-        start_date_str = request.form.get('start_date')
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else datetime.utcnow().date()
-        raw_text = request.form.get('source_text', '').strip()
-        confirmed_topics = request.form.get('confirmed_topics', '').strip()
-        _, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
+        try:
+            title = request.form.get('title', '').strip() or "UPSC Mission"
+            timeline_weeks = _safe_int(request.form.get('timeline_weeks', 0) or 0, 0, 0, 52)
+            hours_per_week = _safe_int(request.form.get('hours_per_week', 6) or 6, 6, 1, 40)
+            study_days_per_week = _safe_int(request.form.get('study_days_per_week', 5) or 5, 5, 1, 7)
+            upsc_focus = request.form.get('upsc_focus', 'full_journey').strip() or "full_journey"
+            if upsc_focus not in UPSC_DEFAULT_SUBJECTS_BY_FOCUS:
+                upsc_focus = "full_journey"
+            upsc_optional_subject = request.form.get('upsc_optional_subject', '').strip()
+            upsc_subjects = request.form.getlist('upsc_subjects')
+            if not upsc_subjects:
+                serialized_subjects = request.form.get('selected_upsc_subjects', '').strip()
+                if serialized_subjects:
+                    upsc_subjects = [item.strip() for item in serialized_subjects.split(",") if item.strip()]
+            start_date = _safe_date(request.form.get('start_date'))
+            personalization_notes = request.form.get('source_text', '').strip()
+            confirmed_topics = request.form.get('confirmed_topics', '').strip()
+            _, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
+            raw_text = _compose_upsc_source_text(upsc_subjects, upsc_optional_subject, upsc_focus, personalization_notes)
 
-        if confirmed_topics:
-            topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
-            if not raw_text:
-                raw_text = _compose_upsc_source_text(upsc_subjects, upsc_optional_subject, upsc_focus)
-        else:
-            topics, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
-            raw_text = _compose_upsc_source_text(upsc_subjects, upsc_optional_subject, upsc_focus)
-            _ensure_upsc_question_bank()
+            if confirmed_topics:
+                topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
+                if not topics:
+                    flash("Please keep at least one study block in your UPSC plan.")
+                    return redirect(url_for('dashboard.create_upsc_roadmap'))
+            else:
+                topics, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
+                _ensure_upsc_question_bank()
 
-        if not confirmed_topics:
-            return render_template(
-                "roadmap_preview.html",
-                title=title,
-                roadmap_type="upsc",
-                timeline_weeks=timeline_weeks,
-                hours_per_week=hours_per_week,
-                study_days_per_week=study_days_per_week,
-                start_date=start_date,
-                raw_text=raw_text,
-                upsc_focus=upsc_focus,
-                upsc_optional_subject=upsc_optional_subject,
-                selected_upsc_subjects=",".join(upsc_subjects),
-                topics="\n".join(topics),
-                original_topics=topics
+            if not confirmed_topics:
+                return render_template(
+                    "roadmap_preview.html",
+                    title=title,
+                    roadmap_type="upsc",
+                    timeline_weeks=timeline_weeks,
+                    hours_per_week=hours_per_week,
+                    study_days_per_week=study_days_per_week,
+                    start_date=start_date,
+                    raw_text=raw_text,
+                    upsc_focus=upsc_focus,
+                    upsc_optional_subject=upsc_optional_subject,
+                    selected_upsc_subjects=",".join(upsc_subjects),
+                    topics="\n".join(topics),
+                    original_topics=topics
+                )
+
+            roadmap, task_ids, auto_fetch, target_date = _persist_roadmap(
+                "upsc", title, raw_text, topics, projects, start_date, timeline_weeks,
+                hours_per_week, study_days_per_week, upsc_focus, upsc_optional_subject
             )
 
-        roadmap, task_ids, auto_fetch, target_date = _persist_roadmap(
-            "upsc", title, raw_text, topics, projects, start_date, timeline_weeks,
-            hours_per_week, study_days_per_week, upsc_focus, upsc_optional_subject
-        )
-
-        if task_ids:
-            upsc_tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
-            for task in upsc_tasks:
-                for res in _upsc_resources_for_task(task.title, upsc_optional_subject):
-                    db.session.add(Resource(
-                        provider=res["provider"],
-                        title=res["title"],
-                        url=res["url"],
-                        summary="Curated UPSC resource",
-                        score=0.95,
-                        task_id=task.id
+            if task_ids:
+                upsc_tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+                for task in upsc_tasks:
+                    for res in _upsc_resources_for_task(task.title, upsc_optional_subject):
+                        db.session.add(Resource(
+                            provider=res["provider"],
+                            title=res["title"],
+                            url=res["url"],
+                            summary="Curated UPSC resource",
+                            score=0.95,
+                            task_id=task.id
+                        ))
+                for spec in _build_upsc_test_plan(start_date, target_date, upsc_focus):
+                    db.session.add(MockTestSchedule(
+                        title=spec["title"],
+                        scheduled_date=spec["scheduled_date"],
+                        duration_minutes=spec["duration_minutes"],
+                        questions_count=spec["questions_count"],
+                        roadmap_id=roadmap.id
                     ))
-            for spec in _build_upsc_test_plan(start_date, target_date, upsc_focus):
-                db.session.add(MockTestSchedule(
-                    title=spec["title"],
-                    scheduled_date=spec["scheduled_date"],
-                    duration_minutes=spec["duration_minutes"],
-                    questions_count=spec["questions_count"],
-                    roadmap_id=roadmap.id
-                ))
-            db.session.commit()
+                db.session.commit()
 
-        if auto_fetch:
-            thread = threading.Thread(
-                target=_background_fetch_resources,
-                args=(current_app._get_current_object(), roadmap.id),
-                daemon=True
-            )
-            thread.start()
-        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+            if auto_fetch:
+                thread = threading.Thread(
+                    target=_background_fetch_resources,
+                    args=(current_app._get_current_object(), roadmap.id),
+                    daemon=True
+                )
+                thread.start()
+            flash("UPSC Mission generated successfully.")
+            return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Failed to create UPSC roadmap")
+            flash("UPSC Mission couldn't be generated right now. Please retry in a moment.")
+            return redirect(url_for('dashboard.create_upsc_roadmap'))
 
     return render_template('upsc_new.html')
 
@@ -1506,31 +1559,20 @@ def _resolve_upsc_subjects(focus="full_journey", selected_subjects=None):
     return list(UPSC_DEFAULT_SUBJECTS_BY_FOCUS.get(focus, UPSC_DEFAULT_SUBJECTS_BY_FOCUS["full_journey"]))
 
 
-def _download_upsc_portal_snapshot():
-    snippets = []
-    for item in UPSC_RESOURCES[:4]:
-        html = _safe_get_text(item["url"])
-        if not html:
-            continue
-        cleaned = re.sub(r"<[^>]+>", " ", html)
-        cleaned = re.sub(r"\s+", " ", cleaned).strip()
-        if cleaned:
-            snippets.append(f"{item['title']}: {cleaned[:700]}")
-    return "\n\n".join(snippets[:3])
-
-
-def _compose_upsc_source_text(selected_subjects, optional_subject, focus):
+def _compose_upsc_source_text(selected_subjects, optional_subject, focus, personalization_notes=""):
     labels = [UPSC_SUBJECT_LIBRARY[key]["label"] for key in selected_subjects if key in UPSC_SUBJECT_LIBRARY]
-    portal_text = _download_upsc_portal_snapshot()
+    guidance = UPSC_OFFICIAL_GUIDANCE.get(focus, UPSC_OFFICIAL_GUIDANCE["full_journey"])
     lines = [
         f"UPSC Focus: {focus}",
         f"Selected Subjects: {', '.join(labels) if labels else 'Default UPSC track'}",
+        "Official Strategy Anchors:",
     ]
+    lines.extend([f"- {item}" for item in guidance])
     if optional_subject:
         lines.append(f"Optional Subject: {optional_subject}")
-    if portal_text:
-        lines.append("Official UPSC portal snapshot:")
-        lines.append(portal_text)
+    if personalization_notes:
+        lines.append("Aspirant Notes:")
+        lines.append(personalization_notes[:1500])
     return "\n".join(lines)
 
 

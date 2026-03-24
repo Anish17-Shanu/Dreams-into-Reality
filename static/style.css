@@ -720,6 +720,24 @@ button:hover,
     border: 1px solid rgba(201, 179, 110, 0.18);
 }
 
+.upsc-strategy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.upsc-strategy-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(201, 179, 110, 0.16);
+    border-radius: 18px;
+    padding: 16px;
+}
+
+.upsc-strategy-card h3 {
+    margin-bottom: 8px;
+}
+
 .diff-list {
     list-style: none;
     padding: 0;

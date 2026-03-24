@@ -18,8 +18,14 @@
         <textarea name="source_text" hidden>{{ raw_text }}</textarea>
         <div class="topic-review-grid">
             <div class="topic-original">
-                <h4>Extracted Topics</h4>
-                <p class="muted">These are the raw topics we pulled from your syllabus.</p>
+                <h4>{% if roadmap_type == 'upsc' %}Recommended Study Blocks{% else %}Extracted Topics{% endif %}</h4>
+                <p class="muted">
+                    {% if roadmap_type == 'upsc' %}
+                    These are the suggested blocks for your current UPSC focus. Trim the plan before we lock it in.
+                    {% else %}
+                    These are the raw topics we pulled from your syllabus.
+                    {% endif %}
+                </p>
                 <ul class="topic-list">
                     {% for topic in original_topics %}
                     <li>{{ topic }}</li>
@@ -48,7 +54,7 @@
             </div>
         </div>
 
-        <button type="submit">Generate roadmap</button>
+        <button type="submit">{% if roadmap_type == 'upsc' %}Generate UPSC Mission{% else %}Generate roadmap{% endif %}</button>
     </form>
 </section>
 <script>

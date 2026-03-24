@@ -25,6 +25,20 @@
 
 <section class="panel upsc-panel">
     <form method="POST" class="stack">
+        <div class="upsc-strategy-grid">
+            <article class="upsc-strategy-card">
+                <h3>Official-first planning</h3>
+                <p class="muted">We build the mission around UPSC syllabus links, PYQ practice, revision cycles, and mock analysis instead of vague motivation.</p>
+            </article>
+            <article class="upsc-strategy-card">
+                <h3>Aspirant rhythm</h3>
+                <p class="muted">Your roadmap is broken into manageable study blocks with realistic weekly load, answer writing, and stage-based checkpoints.</p>
+            </article>
+            <article class="upsc-strategy-card">
+                <h3>Safer generation</h3>
+                <p class="muted">The workflow now avoids fragile live scraping during generation, so creating a mission is faster and more reliable.</p>
+            </article>
+        </div>
         <label>
             Mission title
             <input type="text" name="title" placeholder="e.g. UPSC CSE 2027 Mission">
@@ -79,7 +93,7 @@
         </fieldset>
         <label>
             Notes for personalization
-            <textarea name="source_text" rows="5" placeholder="Optional: mention weak areas, attempt year, or your current progress."></textarea>
+            <textarea name="source_text" rows="5" placeholder="Optional: mention attempt year, weak areas, current level, job/college constraints, or optional-subject concerns."></textarea>
         </label>
         <button type="submit">Generate UPSC Mission</button>
     </form>
