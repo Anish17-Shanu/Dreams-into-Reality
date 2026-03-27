@@ -2,8 +2,8 @@
 
 ## Creator
 
-This project was created, written, and maintained by **Anish Kumar (ANISH KUMAR)**.
-All primary documentation in this README is presented as the work of **Anish Kumar**.
+This project was created, written, and maintained by **ANISH KUMAR**.
+All primary documentation in this README is presented as the work of **ANISH KUMAR**.
 
 Dreams into Reality helps individual learners turn a **syllabus or career goal** into a structured roadmap with tasks, timelines, and curated web resources. Upload your syllabus (PDF/TXT), choose a timeline, and track every step toward your goal.
 
@@ -96,7 +96,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
 - **Free quiz source**: We fetch MCQs from Open Trivia DB when building quick quizzes.
 - **No-API fallback**: A stronger rule-based parser handles bullets, units, and numbered sections when no AI is configured.
 - **Render tip**: `AUTO_FETCH_RESOURCES_ON_CREATE=true` triggers background fetching so creation stays fast.
-- **Career templates**: We query ESCO for occupation skills when you choose `career` and donâ€™t show a fixed list.
+- **Career templates**: We query ESCO for occupation skills when you choose `career` and donÃ¢â‚¬â„¢t show a fixed list.
 - **UPSC resources**: Official UPSC exam calendar and previous question papers are linked from UPSC public pages.
 
 ## Roadmap Creation
