@@ -2,8 +2,8 @@
 
 ## Creator
 
-This project was created, written, and maintained by **ANISH KUMAR**.
-All primary documentation in this README is presented as the work of **ANISH KUMAR**.
+This project was created, written, and maintained by **Anish Kumar**.
+All primary documentation in this README is presented as the work of **Anish Kumar**.
 
 Dreams into Reality helps individual learners turn a **syllabus or career goal** into a structured roadmap with tasks, timelines, and curated web resources. Upload your syllabus (PDF/TXT), choose a timeline, and track every step toward your goal.
 

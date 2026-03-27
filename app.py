@@ -1,4 +1,4 @@
-"""Dreams into Reality application created by ANISH KUMAR."""
+"""Dreams into Reality application created by Anish Kumar."""
 
 from flask import Flask, flash, redirect, request, url_for
 from config import Config
