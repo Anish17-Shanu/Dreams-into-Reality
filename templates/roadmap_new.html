@@ -2,21 +2,25 @@
 {% block content %}
 <section class="panel">
     <div>
-        <span class="pill">Create a plan</span>
-        <h1>Build a simple study or career plan</h1>
-        <p class="muted">Tell us what you want to learn. We will turn it into a plan with clear steps and a manageable timeline.</p>
+        <span class="pill">Create a roadmap</span>
+        <h1>Generate a timeline you can actually follow</h1>
+        <p class="muted">Add your syllabus or career goal, then review the extracted topics before saving the final roadmap. This keeps the output clean, personal, and realistic.</p>
     </div>
     <form method="POST" enctype="multipart/form-data" class="stack">
         <div class="helper-panel">
-            <h3>Best way to use this page</h3>
+            <h3>What works best here</h3>
             <div class="simple-list">
                 <div>
                     <strong>Study / syllabus</strong>
-                    <p class="muted">Paste topics or upload a syllabus file.</p>
+                    <p class="muted">Paste modules, units, or bullet points. We will clean them into a roadmap draft.</p>
                 </div>
                 <div>
                     <strong>Career goal</strong>
-                    <p class="muted">Type a role like "Data Analyst" or "Frontend Developer".</p>
+                    <p class="muted">Type a role like "Data Analyst" or "Frontend Developer" to generate a focused skill path.</p>
+                </div>
+                <div>
+                    <strong>Before you save</strong>
+                    <p class="muted">You will get a review screen to remove noise, reorder topics, and confirm the final timeline.</p>
                 </div>
             </div>
         </div>
@@ -35,7 +39,7 @@
             Timeline in weeks (optional)
             <input type="number" name="timeline_weeks" min="0" max="52" value="0">
         </label>
-        <p class="muted">Leave this as 0 if you want us to estimate the timeline automatically.</p>
+        <p class="muted">Leave this as 0 to auto-estimate based on your available study hours.</p>
         <div class="inline-fields">
             <label>
                 Study hours per week
@@ -62,7 +66,7 @@
             <input type="checkbox" name="use_ai">
             Clean messy syllabus text automatically
         </label>
-        <button type="submit">Create my plan</button>
+        <button type="submit">Generate Timeline &amp; Roadmap</button>
     </form>
 </section>
 {% endblock %}

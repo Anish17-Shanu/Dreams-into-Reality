@@ -7,6 +7,11 @@ All primary documentation in this README is presented as the work of **Anish Kum
 
 Dreams into Reality helps individual learners turn a **syllabus or career goal** into a structured roadmap with tasks, timelines, and curated web resources. Upload your syllabus (PDF/TXT), choose a timeline, and track every step toward your goal.
 
+This project is now set up with safer production defaults:
+- Supabase tables are expected to use RLS when exposed through PostgREST
+- Schema creation is opt-in via `AUTO_CREATE_SCHEMA=true` for local/dev only
+- Production should use `supabase/setup.sql` plus explicit migrations instead of boot-time schema mutation
+
 ## Features
 - Syllabus or career roadmaps with adaptive timelines (PDF/TXT/DOCX/images)
 - Dedicated UPSC roadmap mode with subject selection, official portal syllabus snapshot, PYQ practice, revision blocks, and automatic mock-test scheduling
@@ -56,6 +61,8 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
    SUPABASE_STORAGE_BUCKET=evidence
    SIGNED_URL_EXPIRES_SECONDS=600
    AUTO_FETCH_RESOURCES_ON_CREATE=true
+   AUTO_CREATE_SCHEMA=false
+   SESSION_COOKIE_SECURE=false
    DEFAULT_TIMEZONE=Asia/Kolkata
    ```
 3. Run the app:
@@ -85,6 +92,7 @@ Dreams into Reality helps individual learners turn a **syllabus or career goal**
    - `CROSSREF_MAILTO` (recommended)
    - `GITHUB_TOKEN` (optional, increases GitHub API limits)
 6. Deploy.
+7. Run `supabase/setup.sql` against your Supabase project before opening the app to users.
 
 ## Free API Notes
 - **Wikipedia REST API**: Used for topic summaries. Requires a clear `User-Agent`.
@@ -125,16 +133,26 @@ Dreams-into-Reality/
 
 ## Deployment Checklist
 - Supabase database created
+- `supabase/setup.sql` executed successfully
 - `DATABASE_URL` set in Render
 - `SECRET_KEY` set in Render
 - Supabase Storage bucket created (default: `evidence`)
 - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set in Render
+- `AUTO_CREATE_SCHEMA=false` in production
+- `SESSION_COOKIE_SECURE=true` in production
 - Run migrations when updating models:
   ```bash
   flask db init
   flask db migrate -m "init"
   flask db upgrade
   ```
+
+## Smoke Tests
+Run the safety checks before deploying:
+
+```bash
+python -m unittest tests.test_smoke
+```
 
 ---
 

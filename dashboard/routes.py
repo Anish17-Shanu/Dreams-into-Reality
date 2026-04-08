@@ -12,8 +12,20 @@ import math
 import requests
 import threading
 from supabase import create_client
+from sqlalchemy import inspect
 
 dashboard_bp = Blueprint('dashboard', __name__)
+
+
+def _available_tables():
+    try:
+        return set(inspect(db.engine).get_table_names())
+    except Exception:
+        return set()
+
+
+def _has_table(table_name):
+    return table_name in _available_tables()
 
 CAREER_TEMPLATES = {
     "frontend developer": {
@@ -1865,15 +1877,18 @@ def create_upsc_roadmap():
                             score=0.95,
                             task_id=task.id
                         ))
-                for spec in _build_upsc_test_plan(start_date, target_date, upsc_focus):
-                    db.session.add(MockTestSchedule(
-                        title=spec["title"],
-                        test_type=spec["test_type"],
-                        scheduled_date=spec["scheduled_date"],
-                        duration_minutes=spec["duration_minutes"],
-                        questions_count=spec["questions_count"],
-                        roadmap_id=roadmap.id
-                    ))
+                if _has_table("mock_test_schedule"):
+                    for spec in _build_upsc_test_plan(start_date, target_date, upsc_focus):
+                        db.session.add(MockTestSchedule(
+                            title=spec["title"],
+                            test_type=spec["test_type"],
+                            scheduled_date=spec["scheduled_date"],
+                            duration_minutes=spec["duration_minutes"],
+                            questions_count=spec["questions_count"],
+                            roadmap_id=roadmap.id
+                        ))
+                else:
+                    flash("Roadmap created, but mock-test scheduling is unavailable until the database schema is updated.")
                 db.session.commit()
 
             if auto_fetch:
@@ -1912,17 +1927,22 @@ def view_roadmap(roadmap_id):
             key=lambda r: (-(r.rating_avg + r.score), r.flagged_count)
         )
         annotated_resources_map[task.id] = [_annotate_resource(item) for item in resources_map[task.id]]
-    tests = MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).order_by(MockTestSchedule.scheduled_date.asc()).all()
+    tests = []
+    if _has_table("mock_test_schedule"):
+        tests = MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).order_by(MockTestSchedule.scheduled_date.asc()).all()
     upsc_buckets = _build_upsc_dashboard_data(tasks, tests) if roadmap.roadmap_type == "upsc" else []
     recent_updates = _build_recent_updates(roadmap)
     done_map = {}
     attempts = {}
     quiz_results = []
     if roadmap.roadmap_type == "upsc":
-        for c in PyqCompletion.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).all():
-            done_map.setdefault(c.exam, []).append(c.year)
-        attempts = {a.question_id: a for a in QuestionAttempt.query.filter_by(user_id=session['user_id']).all()}
-        quiz_results = QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
+        if _has_table("pyq_completion"):
+            for c in PyqCompletion.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).all():
+                done_map.setdefault(c.exam, []).append(c.year)
+        if _has_table("question_attempt"):
+            attempts = {a.question_id: a for a in QuestionAttempt.query.filter_by(user_id=session['user_id']).all()}
+        if _has_table("quiz_result"):
+            quiz_results = QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
     today_focus = _build_today_focus(roadmap, tasks, tests)
     week_plan = _build_week_plan(tasks, tests)
     resource_groups_map = {task.id: _build_resource_groups(annotated_resources_map.get(task.id, [])) for task in tasks}
@@ -2015,6 +2035,9 @@ def practice(roadmap_id):
     roadmap = Roadmap.query.get_or_404(roadmap_id)
     if roadmap.user_id != session['user_id']:
         return redirect(url_for('dashboard.dashboard'))
+    if not all(_has_table(name) for name in ["question", "question_attempt", "pyq_completion"]):
+        flash("Practice Vault is temporarily unavailable until the database schema is updated.")
+        return redirect(url_for('dashboard.dashboard'))
     _ensure_upsc_question_bank()
     questions = Question.query.filter_by(exam="UPSC").limit(60).all()
     attempts = {a.question_id: a for a in QuestionAttempt.query.filter_by(user_id=session['user_id']).all()}
@@ -2032,7 +2055,7 @@ def practice(roadmap_id):
         MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).all(),
         done_map,
         attempts,
-        QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
+        QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all() if _has_table("quiz_result") else []
     )
     return render_template(
         "practice.html",
@@ -2053,6 +2076,9 @@ def practice(roadmap_id):
 def quiz(roadmap_id):
     roadmap = Roadmap.query.get_or_404(roadmap_id)
     if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    if not _has_table("quiz_result"):
+        flash("Quiz history is temporarily unavailable until the database schema is updated.")
         return redirect(url_for('dashboard.dashboard'))
     amount = _safe_int(request.args.get("amount", 10), 10, 5, 20)
     difficulty = request.args.get("difficulty", "medium")

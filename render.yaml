@@ -31,5 +31,9 @@ services:
         value: "600"
       - key: AUTO_FETCH_RESOURCES_ON_CREATE
         value: "true"
+      - key: AUTO_CREATE_SCHEMA
+        value: "false"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
       - key: DEFAULT_TIMEZONE
         value: "Asia/Kolkata"

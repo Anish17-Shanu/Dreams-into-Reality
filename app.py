@@ -66,6 +66,15 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
 
 
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return response
+
+
 @app.errorhandler(RequestEntityTooLarge)
 def handle_large_upload(error):
     max_mb = app.config.get("MAX_CONTENT_LENGTH_MB", 20)
@@ -76,7 +85,7 @@ def handle_large_upload(error):
 
 with app.app_context():
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-    if os.getenv("AUTO_CREATE_SCHEMA", "true").lower() == "true":
+    if app.config.get("AUTO_CREATE_SCHEMA"):
         ensure_schema()
 
 if __name__ == "__main__":

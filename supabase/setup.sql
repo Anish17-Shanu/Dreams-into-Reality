@@ -149,3 +149,34 @@ create index if not exists idx_task_roadmap_id on task(roadmap_id);
 create index if not exists idx_resource_task_id on resource(task_id);
 create index if not exists idx_feedback_resource_id on resource_feedback(resource_id);
 create index if not exists idx_checkin_roadmap_id on checkin(roadmap_id);
+
+-- Security hardening for Supabase API exposure
+-- This app uses server-side Flask + direct database access, so these tables
+-- should not be readable from the public PostgREST API by default.
+
+alter table "user" enable row level security;
+alter table roadmap enable row level security;
+alter table task enable row level security;
+alter table resource enable row level security;
+alter table resource_feedback enable row level security;
+alter table checkin enable row level security;
+alter table question enable row level security;
+alter table question_attempt enable row level security;
+alter table pyq_completion enable row level security;
+alter table mock_test_schedule enable row level security;
+alter table quiz_result enable row level security;
+
+revoke all on table "user" from anon, authenticated;
+revoke all on table roadmap from anon, authenticated;
+revoke all on table task from anon, authenticated;
+revoke all on table resource from anon, authenticated;
+revoke all on table resource_feedback from anon, authenticated;
+revoke all on table checkin from anon, authenticated;
+revoke all on table question from anon, authenticated;
+revoke all on table question_attempt from anon, authenticated;
+revoke all on table pyq_completion from anon, authenticated;
+revoke all on table mock_test_schedule from anon, authenticated;
+revoke all on table quiz_result from anon, authenticated;
+
+-- If you later want public API access for selected records, add explicit RLS
+-- policies then grant only the minimum required privileges back.
