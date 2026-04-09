@@ -27,17 +27,17 @@
         <article class="card soft-card">
             <p class="eyebrow">Today</p>
             <h3>{{ today_focus.next_task.title if today_focus.next_task else 'You are caught up' }}</h3>
-            <p class="muted">{% if today_focus.next_task %}Best next step to keep momentum.{% else %}Review your notes or take a light revision session.{% endif %}</p>
+            <p class="muted">{% if today_focus.next_task %}Best next step to keep momentum. Recommended focus block: {{ execution_support.session_minutes }} min.{% else %}Review your notes or take a light revision session.{% endif %}</p>
         </article>
         <article class="card soft-card">
-            <p class="eyebrow">Next test</p>
-            <h3>{{ today_focus.next_test.title if today_focus.next_test else 'No test scheduled' }}</h3>
-            <p class="muted">{% if today_focus.next_test %}Scheduled for {{ today_focus.next_test.scheduled_date }}.{% else %}Add a checkpoint to keep exam rhythm strong.{% endif %}</p>
+            <p class="eyebrow">Execution mode</p>
+            <h3>{{ execution_support.pace_mode }}</h3>
+            <p class="muted">{{ execution_support.why_now }}</p>
         </article>
         <article class="card soft-card">
-            <p class="eyebrow">Revision focus</p>
-            <h3>{{ today_focus.revision_task.title if today_focus.revision_task else 'Revision block pending' }}</h3>
-            <p class="muted">{{ today_focus.due_soon_count }} task(s) need attention soon.</p>
+            <p class="eyebrow">Deadline feel</p>
+            <h3>{{ execution_support.deadline_feel }}</h3>
+            <p class="muted">{{ execution_support.next_reset }}</p>
         </article>
     </div>
 
@@ -80,6 +80,7 @@
             {% else %}
             <p class="muted">No fixed items this week. Use the time for revision or catch-up.</p>
             {% endif %}
+            <p class="muted">What changed this week: {{ week_changes.tasks_completed }} task(s), {{ week_changes.minutes_logged }} minutes logged, {{ week_changes.tests_completed }} test(s) completed. {{ week_changes.message }}</p>
         </article>
         <article class="card soft-card">
             <h3>Readiness</h3>
@@ -91,6 +92,31 @@
                         <div class="progress-bar" style="width: {{ metric.value }}%"></div>
                     </div>
                     <p class="muted">{{ metric.hint }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+    </div>
+
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Recovery Options</h3>
+            <div class="simple-list">
+                {% for option in recovery_options %}
+                <div class="recovery-card recovery-{{ option.impact }}">
+                    <strong>{{ option.title }}</strong>
+                    <p class="muted">{{ option.detail }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+        <article class="card soft-card">
+            <h3>Risk Radar</h3>
+            <div class="simple-list">
+                {% for alert in risk_alerts %}
+                <div class="risk-card risk-{{ alert.tone }}">
+                    <strong>{{ alert.title }}</strong>
+                    <p class="muted">{{ alert.detail }}</p>
                 </div>
                 {% endfor %}
             </div>
@@ -136,6 +162,68 @@
             <p class="muted">Resource status: {{ roadmap.resource_fetch_status|capitalize }}</p>
             <p class="muted">Streak: {{ roadmap.streak }} days | Last check-in: {{ last_checkin }}</p>
         </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Monthly Review</h2>
+            <p class="muted">A calmer lens on the last 30 days so you can improve the system, not just push harder.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        <article class="card soft-card">
+            <p class="eyebrow">Headline</p>
+            <h3>{{ monthly_review.headline }}</h3>
+            <p class="muted">{{ monthly_review.summary }}</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Output</p>
+            <h3>{{ monthly_review.tasks_completed }} tasks</h3>
+            <p class="muted">{{ monthly_review.minutes_logged }} minutes logged over the last 30 days.</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Pressure points</p>
+            <h3>{{ monthly_review.overdue_count }} overdue</h3>
+            <p class="muted">{{ monthly_review.active_tasks }} task(s) are active right now.</p>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Outcome Scorecard</h2>
+            <p class="muted">This roadmap should produce visible proof, not just checked boxes.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        {% for artifact in outcome_artifacts %}
+        <article class="card soft-card">
+            <p class="eyebrow">Proof point</p>
+            <h3>{{ artifact.title }}</h3>
+            <p class="muted">{{ artifact.detail }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Why This Plan Is Trustworthy</h2>
+            <p class="muted">These signals keep the roadmap grounded in execution rather than vague planning.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        {% for signal in confidence_signals %}
+        <article class="card soft-card">
+            <p class="eyebrow">Confidence signal</p>
+            <h3>{{ signal.title }}</h3>
+            <p class="muted">{{ signal.detail }}</p>
+        </article>
+        {% endfor %}
     </div>
 </section>
 

@@ -22,8 +22,8 @@
         </article>
         <article class="card summary-card">
             <p class="eyebrow">Best next move</p>
-            <h3>{% if pyq_total < 10 %}Do more PYQs{% elif avg_score < 3.5 %}Practice writing{% else %}Take a test{% endif %}</h3>
-            <p class="muted">The app nudges you toward the highest-value next step.</p>
+            <h3>{{ practice_coach.headline }}</h3>
+            <p class="muted">{{ practice_coach.recommendation }}</p>
         </article>
     </div>
 
@@ -56,6 +56,41 @@
                 <div>
                     <strong>3. Return here weekly</strong>
                     <p class="muted">Use it as your practice and revision checkpoint.</p>
+                </div>
+            </div>
+        </article>
+    </div>
+
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Weak-Area Radar</h3>
+            {% if weak_areas %}
+            <div class="simple-list">
+                {% for area in weak_areas %}
+                <div class="risk-card risk-{{ area.tone }}">
+                    <strong>{{ area.topic }}: {{ area.avg_score }}/5</strong>
+                    <p class="muted">{{ area.attempts }} attempt(s). {{ area.action }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="muted">Start saving answer scores and this section will show where your real weak spots are.</p>
+            {% endif %}
+        </article>
+        <article class="card soft-card">
+            <h3>Practice Coach</h3>
+            <div class="simple-list">
+                <div>
+                    <strong>Main focus</strong>
+                    <p class="muted">{{ practice_coach.focus_topic }}</p>
+                </div>
+                <div>
+                    <strong>System advice</strong>
+                    <p class="muted">{{ practice_coach.recommendation }}</p>
+                </div>
+                <div>
+                    <strong>Best next move</strong>
+                    <p class="muted">{% if pyq_total < 10 %}Increase PYQ coverage this week.{% elif avg_score < 3.5 %}Do one shorter answer-writing session tomorrow.{% else %}Take a diagnostic or sectional test and review it carefully.{% endif %}</p>
                 </div>
             </div>
         </article>

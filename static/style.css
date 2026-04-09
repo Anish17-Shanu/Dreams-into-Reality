@@ -1406,6 +1406,36 @@ button:hover,
     gap: 10px;
 }
 
+.risk-card,
+.recovery-card {
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: #fff;
+}
+
+.risk-high {
+    background: #fff1ec;
+    border-color: #efc1ae;
+}
+
+.risk-medium {
+    background: #fff8e8;
+    border-color: #e8d39b;
+}
+
+.risk-low,
+.recovery-steady,
+.recovery-calm {
+    background: #f5fbf4;
+    border-color: #c7dbc1;
+}
+
+.recovery-urgent {
+    background: #fff4e8;
+    border-color: #efcea6;
+}
+
 .upsc-hero,
 .upsc-panel {
     background: var(--card);

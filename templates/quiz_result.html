@@ -43,18 +43,11 @@
         <article class="card soft-card">
             <h3>Best next step</h3>
             <div class="simple-list">
+                {% for step in next_steps %}
                 <div>
-                    <strong>If accuracy is low</strong>
-                    <p class="muted">Revise core concepts and take a shorter test again.</p>
+                    <p class="muted">{{ step }}</p>
                 </div>
-                <div>
-                    <strong>If accuracy is moderate</strong>
-                    <p class="muted">Do PYQs and topic revision before the next mock.</p>
-                </div>
-                <div>
-                    <strong>If accuracy is high</strong>
-                    <p class="muted">Increase question volume or difficulty to stretch yourself.</p>
-                </div>
+                {% endfor %}
             </div>
         </article>
     </div>

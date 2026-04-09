@@ -11,6 +11,7 @@
         <input type="hidden" name="timeline_weeks" value="{{ timeline_weeks }}">
         <input type="hidden" name="hours_per_week" value="{{ hours_per_week }}">
         <input type="hidden" name="study_days_per_week" value="{{ study_days_per_week }}">
+        <input type="hidden" name="pace_mode" value="{{ pace_mode or 'steady' }}">
         <input type="hidden" name="start_date" value="{{ start_date }}">
         <input type="hidden" name="upsc_focus" value="{{ upsc_focus or '' }}">
         <input type="hidden" name="upsc_optional_subject" value="{{ upsc_optional_subject or '' }}">
@@ -54,7 +55,7 @@
             </div>
         </div>
 
-        <button type="submit">{% if roadmap_type == 'upsc' %}Generate UPSC Mission{% else %}Generate roadmap{% endif %}</button>
+        <button type="submit">{% if roadmap_type == 'upsc' %}Lock In My UPSC Mission{% else %}Lock In My Roadmap{% endif %}</button>
     </form>
 </section>
 <script>

@@ -30,6 +30,30 @@
     </article>
 </section>
 
+{% if active_roadmap %}
+<section class="grid grid-2 compact-grid">
+    <article class="card soft-card">
+        <p class="eyebrow">Active system</p>
+        <h3>{{ active_roadmap.title }}</h3>
+        <p class="muted">{% if active_next %}Next move: {{ active_next.title }}{% else %}This roadmap is ready for review or export.{% endif %}</p>
+        <div class="action-links">
+            <a class="primary-link" href="{{ url_for('dashboard.view_roadmap', roadmap_id=active_roadmap.id) }}">Open execution view</a>
+        </div>
+    </article>
+    <article class="card soft-card">
+        <p class="eyebrow">Recent upgrades</p>
+        <div class="simple-list">
+            {% for item in recent_improvements %}
+            <div>
+                <strong>{{ item.title }}</strong>
+                <p class="muted">{{ item.detail }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endif %}
+
 <section class="grid">
     {% if roadmaps %}
         {% for roadmap in roadmaps %}

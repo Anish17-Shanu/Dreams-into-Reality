@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, session, url_for, current_app, flash, send_file
 from extensions import db
 from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin, Question, QuestionAttempt, PyqCompletion, MockTestSchedule, QuizResult
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, UTC
 from werkzeug.utils import secure_filename
 from urllib.parse import quote
 import os
@@ -16,6 +16,12 @@ from sqlalchemy import inspect
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
+RECENT_IMPROVEMENTS = [
+    {"title": "Safer roadmap generation", "detail": "Creation flow now protects against fragile schema-dependent crashes."},
+    {"title": "Adaptive recovery guidance", "detail": "Plans now explain how to catch up, rebalance, or reduce stress without guessing."},
+    {"title": "Sharper execution view", "detail": "Roadmaps surface today, this week, risks, momentum, and monthly progress in one place."},
+]
+
 
 def _available_tables():
     try:
@@ -26,6 +32,30 @@ def _available_tables():
 
 def _has_table(table_name):
     return table_name in _available_tables()
+
+
+def _normalize_pace_mode(value):
+    value = (value or "steady").strip().lower()
+    if value in {"burnout_safe", "steady", "sprint"}:
+        return value
+    return "steady"
+
+
+def _pace_label(value):
+    labels = {
+        "burnout_safe": "Burnout-safe",
+        "steady": "Steady",
+        "sprint": "Fast-track",
+    }
+    return labels.get(_normalize_pace_mode(value), "Steady")
+
+
+def _utc_now():
+    return datetime.now(UTC)
+
+
+def _utc_today():
+    return _utc_now().date()
 
 CAREER_TEMPLATES = {
     "frontend developer": {
@@ -744,11 +774,32 @@ def _safe_int(value, default, minimum=None, maximum=None):
 
 def _safe_date(value, fallback=None):
     if not value:
-        return fallback or datetime.utcnow().date()
+        return fallback or _utc_today()
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except (TypeError, ValueError):
-        return fallback or datetime.utcnow().date()
+        return fallback or _utc_today()
+
+
+def _embed_plan_preferences(raw_text, pace_mode):
+    pace_mode = _normalize_pace_mode(pace_mode)
+    base = (raw_text or "").strip()
+    if "Pace Mode:" in base:
+        return base
+    suffix = f"Pace Mode: {_pace_label(pace_mode)}"
+    return f"{base}\n{suffix}".strip()
+
+
+def _extract_pace_mode_from_source_text(source_text):
+    match = re.search(r"Pace Mode:\s*(.+)", source_text or "", flags=re.IGNORECASE)
+    if not match:
+        return "steady"
+    label = _normalize(match.group(1))
+    if "burnout" in label or "safe" in label:
+        return "burnout_safe"
+    if "fast" in label or "sprint" in label:
+        return "sprint"
+    return "steady"
 
 
 def _extract_topics_from_text(text):
@@ -1170,17 +1221,23 @@ def _fetch_resources_for_topic(topic):
     return resources
 
 
-def _schedule_items(items, start_date, timeline_weeks, hours_per_week, study_days_per_week):
+def _schedule_items(items, start_date, timeline_weeks, hours_per_week, study_days_per_week, pace_mode="steady"):
     tasks = []
     if not items:
         items = ["Define milestones", "Gather resources", "Start learning", "Build a mini project"]
 
     estimated_hours = [_estimate_hours(item) for item in items]
     total_hours = sum(estimated_hours) or 1
+    pace_mode = _normalize_pace_mode(pace_mode)
+    pace_multiplier = {
+        "burnout_safe": 1.2,
+        "steady": 1.0,
+        "sprint": 0.85,
+    }[pace_mode]
     if timeline_weeks and timeline_weeks > 0:
         total_days = max(timeline_weeks * 7, 7)
     else:
-        total_days = max(math.ceil(total_hours / max(hours_per_week, 1) * 7), 7)
+        total_days = max(math.ceil(total_hours / max(hours_per_week, 1) * 7 * pace_multiplier), 7)
 
     current_date = start_date
     for idx, item in enumerate(items):
@@ -1211,19 +1268,20 @@ def _auto_adjust_roadmap_timeline(roadmap, start_date=None, timeline_weeks=0):
     if not remaining_tasks:
         last_completed = max(
             [task.completed_at.date() for task in completed_tasks if task.completed_at],
-            default=date.today()
+            default=_utc_today()
         )
         roadmap.target_date = last_completed
         roadmap.total_hours_est = round(completed_hours, 1)
         return
 
-    schedule_start = start_date or date.today()
+    schedule_start = start_date or _utc_today()
     task_specs, remaining_hours, computed_end = _schedule_items(
         [task.title for task in remaining_tasks],
         schedule_start,
         timeline_weeks,
         roadmap.hours_per_week,
-        roadmap.study_days_per_week
+        roadmap.study_days_per_week,
+        _extract_pace_mode_from_source_text(roadmap.source_text),
     )
 
     for task, spec in zip(remaining_tasks, task_specs):
@@ -1237,18 +1295,19 @@ def _auto_adjust_roadmap_timeline(roadmap, start_date=None, timeline_weeks=0):
 def _build_recent_updates(roadmap):
     updates = []
 
-    for checkin in Checkin.query.filter_by(roadmap_id=roadmap.id).order_by(Checkin.created_at.desc()).limit(8).all():
-        text_bits = []
-        if checkin.minutes:
-            text_bits.append(f"{checkin.minutes} minutes logged")
-        if checkin.note:
-            text_bits.append(checkin.note)
-        updates.append({
-            "kind": "checkin",
-            "title": "Progress update",
-            "body": " - ".join(text_bits) if text_bits else "Study session logged",
-            "when": checkin.created_at,
-        })
+    if _has_table("checkin"):
+        for checkin in Checkin.query.filter_by(roadmap_id=roadmap.id).order_by(Checkin.created_at.desc()).limit(8).all():
+            text_bits = []
+            if checkin.minutes:
+                text_bits.append(f"{checkin.minutes} minutes logged")
+            if checkin.note:
+                text_bits.append(checkin.note)
+            updates.append({
+                "kind": "checkin",
+                "title": "Progress update",
+                "body": " - ".join(text_bits) if text_bits else "Study session logged",
+                "when": checkin.created_at,
+            })
 
     for task in Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.updated_at.desc()).limit(12).all():
         if task.notes or task.status == "done":
@@ -1271,7 +1330,7 @@ def _build_recent_updates(roadmap):
 
 
 def _build_today_focus(roadmap, tasks, tests):
-    today = date.today()
+    today = _utc_today()
     next_task = next((task for task in tasks if task.status != "done"), None)
     upcoming_tests = [test for test in tests if test.status != "completed" and test.scheduled_date >= today]
     next_test = upcoming_tests[0] if upcoming_tests else None
@@ -1291,11 +1350,242 @@ def _build_today_focus(roadmap, tasks, tests):
 
 
 def _build_week_plan(tasks, tests):
-    today = date.today()
+    today = _utc_today()
     week_end = today + timedelta(days=7)
     week_tasks = [task for task in tasks if task.status != "done" and task.due_date and today <= task.due_date <= week_end][:5]
     week_tests = [test for test in tests if today <= test.scheduled_date <= week_end][:3]
     return {"tasks": week_tasks, "tests": week_tests}
+
+
+def _build_weekly_change_summary(roadmap, tasks, tests):
+    week_start = _utc_now() - timedelta(days=7)
+    completed = [task for task in tasks if task.completed_at and task.completed_at >= week_start]
+    checkins = []
+    if _has_table("checkin"):
+        checkins = Checkin.query.filter_by(roadmap_id=roadmap.id).filter(Checkin.created_at >= week_start).all()
+    completed_tests = [test for test in tests if test.status == "completed" and test.created_at and test.created_at >= week_start]
+    minutes = sum(item.minutes or 0 for item in checkins)
+    return {
+        "tasks_completed": len(completed),
+        "minutes_logged": minutes,
+        "tests_completed": len(completed_tests),
+        "message": "Momentum is building." if len(completed) >= 2 or minutes >= 180 else "A small reset this week can quickly restore momentum.",
+    }
+
+
+def _build_monthly_review(roadmap, tasks, tests):
+    period_start = _utc_now() - timedelta(days=30)
+    completed = [task for task in tasks if task.completed_at and task.completed_at >= period_start]
+    active = [task for task in tasks if task.status == "doing"]
+    overdue = [task for task in tasks if task.status != "done" and task.due_date and task.due_date < _utc_today()]
+    checkins = []
+    if _has_table("checkin"):
+        checkins = Checkin.query.filter_by(roadmap_id=roadmap.id).filter(Checkin.created_at >= period_start).all()
+    total_minutes = sum(item.minutes or 0 for item in checkins)
+    return {
+        "tasks_completed": len(completed),
+        "active_tasks": len(active),
+        "minutes_logged": total_minutes,
+        "overdue_count": len(overdue),
+        "headline": "Strong month of execution." if len(completed) >= 4 else "Your system still has room to tighten.",
+        "summary": "You are turning plans into output." if len(completed) >= 4 else "A steadier weekly rhythm will make the roadmap feel much lighter.",
+    }
+
+
+def _build_risk_alerts(roadmap, tasks, tests, forecast):
+    alerts = []
+    today = _utc_today()
+    overdue = [task for task in tasks if task.status != "done" and task.due_date and task.due_date < today]
+    due_soon = [task for task in tasks if task.status != "done" and task.due_date and today <= task.due_date <= today + timedelta(days=3)]
+    hard_open = [task for task in tasks if task.status != "done" and task.difficulty == "hard"][:3]
+    missed_tests = [test for test in tests if test.status == "missed"]
+
+    if forecast and forecast > roadmap.target_date:
+        slip_days = max((forecast - roadmap.target_date).days, 1)
+        alerts.append({"title": "Deadline risk", "detail": f"At the current pace, you may finish about {slip_days} day(s) late.", "tone": "high"})
+    if overdue:
+        alerts.append({"title": "Overdue tasks", "detail": f"{len(overdue)} task(s) are overdue and need a catch-up decision.", "tone": "high"})
+    if len(due_soon) >= 3:
+        alerts.append({"title": "Crowded next 72 hours", "detail": f"{len(due_soon)} items are due soon. Protect a focused block before adding anything new.", "tone": "medium"})
+    if missed_tests:
+        alerts.append({"title": "Test rhythm slipped", "detail": f"{len(missed_tests)} test(s) were missed. Rebooking one checkpoint will restore confidence.", "tone": "medium"})
+    if hard_open:
+        alerts.append({"title": "Weak-area cluster", "detail": f"Hard unfinished work is building up around {hard_open[0].title}.", "tone": "medium"})
+    if not alerts:
+        alerts.append({"title": "Low immediate risk", "detail": "Your roadmap is stable right now. Stay consistent and protect revision time.", "tone": "low"})
+    return alerts[:4]
+
+
+def _build_recovery_options(roadmap, tasks, forecast):
+    remaining_tasks = [task for task in tasks if task.status != "done"]
+    if not remaining_tasks:
+        return [{"title": "Celebrate and extend", "detail": "You finished this roadmap. Archive it, export it, or start the next mission.", "impact": "positive"}]
+
+    today = _utc_today()
+    remaining_hours = round(sum(task.estimated_hours or 0 for task in remaining_tasks), 1)
+    days_left = max((roadmap.target_date - today).days, 1)
+    hours_needed = math.ceil(remaining_hours / max(days_left / 7, 1))
+    options = [
+        {
+            "title": "Hold the current rhythm",
+            "detail": f"Stay at {roadmap.hours_per_week} hr/week and keep your next action small enough to finish today.",
+            "impact": "steady",
+        }
+    ]
+
+    if hours_needed > roadmap.hours_per_week:
+        options.append({
+            "title": "Increase weekly hours",
+            "detail": f"Raise your study rhythm to about {hours_needed} hr/week to protect the current deadline.",
+            "impact": "urgent",
+        })
+
+    if forecast and forecast > roadmap.target_date:
+        extend_weeks = max(math.ceil((forecast - roadmap.target_date).days / 7), 1)
+        options.append({
+            "title": "Extend the timeline",
+            "detail": f"Add about {extend_weeks} week(s) if you want to preserve quality and reduce pressure.",
+            "impact": "calm",
+        })
+
+    options.append({
+        "title": "Use burnout-safe catch-up",
+        "detail": "Keep one lighter day each week, finish overdue work first, and avoid stacking more than two hard tasks back to back.",
+        "impact": "calm",
+    })
+    return options[:3]
+
+
+def _build_execution_support(roadmap, tasks, tests):
+    today = _utc_today()
+    next_task = next((task for task in tasks if task.status != "done"), None)
+    if next_task:
+        session_minutes = max(25, min(int((next_task.estimated_hours or 1) * 60), 120))
+        why_now = "It unlocks the next milestone." if next_task.difficulty != "hard" else "Finishing this hard block will reduce future stress."
+    else:
+        session_minutes = 30
+        why_now = "Use the time for revision, reflection, or your next goal."
+
+    overdue = len([task for task in tasks if task.status != "done" and task.due_date and task.due_date < today])
+    return {
+        "pace_mode": _pace_label(_extract_pace_mode_from_source_text(roadmap.source_text)),
+        "session_minutes": session_minutes,
+        "why_now": why_now,
+        "deadline_feel": "At risk" if overdue else "Controlled",
+        "next_reset": "Catch up on overdue work first." if overdue else "Protect your next focused session.",
+        "tests_planned": len([test for test in tests if test.status == "planned"]),
+    }
+
+
+def _build_confidence_signals(roadmap, tasks):
+    project_count = len([task for task in tasks if task.title.startswith("Project:")])
+    return [
+        {"title": "Editable roadmap origin", "detail": "This plan came through a preview-and-confirm flow instead of locking instantly."},
+        {"title": "Adaptive schedule", "detail": "Due dates rebalance as you check in, complete tasks, or change the timeline."},
+        {"title": "Execution proof", "detail": f"{roadmap.completed_tasks} task(s) completed and {project_count} outcome-driven project block(s) mapped."},
+    ]
+
+
+def _build_outcome_artifacts(roadmap, tasks):
+    project_titles = [task.title.replace("Project: ", "") for task in tasks if task.title.startswith("Project:")]
+    if roadmap.roadmap_type == "career":
+        artifacts = [
+            {"title": "Portfolio proof", "detail": project_titles[0] if project_titles else "Ship one portfolio-ready project from this roadmap."},
+            {"title": "Resume bullet", "detail": "Turn completed projects and milestones into measurable resume achievements."},
+            {"title": "Interview story", "detail": "Use your hardest completed task as a proof point for problem-solving and consistency."},
+        ]
+    elif roadmap.roadmap_type == "upsc":
+        artifacts = [
+            {"title": "Prelims confidence", "detail": "Convert PYQ and quiz progress into stronger accuracy under pressure."},
+            {"title": "Mains proof", "detail": "Build answer-writing consistency and mock analysis that improve written performance."},
+            {"title": "Revision discipline", "detail": "Use milestone completion and test rhythm as proof that your system is working."},
+        ]
+    else:
+        artifacts = [
+            {"title": "Concept mastery", "detail": "Use completion, notes, and revision to prove this syllabus is actually being absorbed."},
+            {"title": "Revision readiness", "detail": "A finished roadmap should leave you with clear weak areas and a review plan."},
+            {"title": "Visible momentum", "detail": "Every completed block turns the syllabus into something measurable and manageable."},
+        ]
+    return artifacts
+
+
+def _build_weak_area_summary(questions, attempts):
+    if not questions:
+        return []
+
+    question_map = {q.id: q for q in questions}
+    topic_buckets = {}
+    for question_id, attempt in attempts.items():
+        question = question_map.get(question_id)
+        if not question:
+            continue
+        topic = (question.topic or question.subject or "General practice").strip()
+        bucket = topic_buckets.setdefault(topic, {"scores": [], "count": 0})
+        bucket["scores"].append(attempt.score)
+        bucket["count"] += 1
+
+    insights = []
+    for topic, payload in topic_buckets.items():
+        avg_score = round(sum(payload["scores"]) / max(len(payload["scores"]), 1), 1)
+        if avg_score < 2.5:
+            action = "Relearn the core idea and answer one small question again tomorrow."
+            tone = "high"
+        elif avg_score < 3.5:
+            action = "Keep practicing until your answer structure becomes quicker and cleaner."
+            tone = "medium"
+        else:
+            action = "This area is improving. Protect it with revision instead of over-studying."
+            tone = "low"
+        insights.append({
+            "topic": topic,
+            "avg_score": avg_score,
+            "attempts": payload["count"],
+            "action": action,
+            "tone": tone,
+        })
+
+    insights.sort(key=lambda item: (item["avg_score"], -item["attempts"], item["topic"]))
+    return insights[:5]
+
+
+def _build_practice_coach(pyq_total, avg_score, weak_areas):
+    if pyq_total < 10:
+        headline = "Pattern recognition still needs work."
+        recommendation = "Push PYQ coverage before adding too many fresh sources."
+    elif avg_score < 3.5:
+        headline = "Knowledge is there, but written execution is lagging."
+        recommendation = "Focus on timed answer writing and shorter review loops."
+    else:
+        headline = "Your practice system is getting stronger."
+        recommendation = "Increase test pressure gradually instead of dramatically."
+
+    weak_area = weak_areas[0]["topic"] if weak_areas else "General accuracy"
+    return {
+        "headline": headline,
+        "recommendation": recommendation,
+        "focus_topic": weak_area,
+    }
+
+
+def _build_quiz_next_steps(accuracy, result):
+    steps = []
+    if accuracy < 50:
+        steps.append("Switch to a shorter quiz after revising the weakest topic.")
+        steps.append("Do not increase volume yet. Fix accuracy before speed.")
+    elif accuracy < 75:
+        steps.append("Keep the same difficulty and improve elimination quality.")
+        steps.append("Review wrong answers and connect them to one revision session.")
+    else:
+        steps.append("Raise either difficulty or volume, but not both at the same time.")
+        steps.append("Use this score as proof that your revision loop is working.")
+
+    if result.incorrect > result.correct:
+        steps.append("Too many risky attempts. Slow down and answer more selectively.")
+    elif result.correct == result.total_questions:
+        steps.append("Try a harder paper or a longer set to stretch your edge.")
+    else:
+        steps.append("Retest within 48 hours to lock in retention.")
+    return steps[:3]
 
 
 def _build_resource_groups(resources):
@@ -1601,24 +1891,24 @@ def _build_readiness_metrics(roadmap, tasks, tests, done_map=None, attempts=None
     return [{"label": "Plan readiness", "value": overall, "hint": "Built from task completion, tests, and progress quality."}]
 
 
-def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week):
+def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week, pace_mode="steady"):
     all_items = topics[:]
     if roadmap_type in {"career", "upsc"}:
         for project in projects:
             all_items.append(f"Project: {project}")
-    return _schedule_items(all_items, start_date, timeline_weeks, hours_per_week, study_days_per_week)
+    return _schedule_items(all_items, start_date, timeline_weeks, hours_per_week, study_days_per_week, pace_mode)
 
 
 def _background_fetch_resources(app, roadmap_id):
     with app.app_context():
         if not current_app.config.get("ENABLE_EXTERNAL_RESOURCES", True):
             return
-        roadmap = Roadmap.query.get(roadmap_id)
+        roadmap = db.session.get(Roadmap, roadmap_id)
         if not roadmap:
             return
         try:
             roadmap.resource_fetch_status = "running"
-            roadmap.resource_fetch_started_at = datetime.utcnow()
+            roadmap.resource_fetch_started_at = _utc_now().replace(tzinfo=None)
             db.session.commit()
             tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
             for task in tasks:
@@ -1634,9 +1924,9 @@ def _background_fetch_resources(app, roadmap_id):
                         score=res.get("score", 0.0),
                         task_id=task.id
                     ))
-                task.last_resource_refresh = datetime.utcnow()
+                task.last_resource_refresh = _utc_now().replace(tzinfo=None)
             roadmap.resource_fetch_status = "done"
-            roadmap.resource_fetch_completed_at = datetime.utcnow()
+            roadmap.resource_fetch_completed_at = _utc_now().replace(tzinfo=None)
             db.session.commit()
         except Exception:
             roadmap.resource_fetch_status = "failed"
@@ -1648,13 +1938,13 @@ def _background_fetch_resources(app, roadmap_id):
 def _calculate_forecast(roadmap):
     if roadmap.total_tasks == 0:
         return None
-    days_elapsed = max((datetime.utcnow().date() - roadmap.start_date).days, 1)
+    days_elapsed = max((_utc_today() - roadmap.start_date).days, 1)
     pace = roadmap.completed_tasks / days_elapsed
     if pace <= 0:
         return None
     remaining = roadmap.total_tasks - roadmap.completed_tasks
     est_days_left = math.ceil(remaining / pace)
-    return datetime.utcnow().date() + timedelta(days=est_days_left)
+    return _utc_today() + timedelta(days=est_days_left)
 
 
 def _update_streak(roadmap, checkin_date):
@@ -1679,9 +1969,13 @@ def home():
 @dashboard_bp.route('/dashboard')
 @login_required
 def dashboard():
-    user = User.query.get(session['user_id'])
+    user = db.session.get(User, session['user_id'])
     roadmaps = Roadmap.query.filter_by(user_id=user.id).order_by(Roadmap.created_at.desc()).all()
-    return render_template('dashboard.html', user=user, roadmaps=roadmaps)
+    active_roadmap = roadmaps[0] if roadmaps else None
+    active_next = None
+    if active_roadmap:
+        active_next = Task.query.filter_by(roadmap_id=active_roadmap.id).filter(Task.status != "done").order_by(Task.order_index.asc()).first()
+    return render_template('dashboard.html', user=user, roadmaps=roadmaps, active_roadmap=active_roadmap, active_next=active_next, recent_improvements=RECENT_IMPROVEMENTS)
 
 
 @dashboard_bp.route('/roadmap/new', methods=['GET', 'POST'])
@@ -1691,6 +1985,7 @@ def create_roadmap():
         try:
             title = request.form.get('title', '').strip()
             roadmap_type = request.form.get('roadmap_type', 'syllabus')
+            pace_mode = _normalize_pace_mode(request.form.get('pace_mode', 'steady'))
             if roadmap_type not in {"syllabus", "career"}:
                 roadmap_type = "syllabus"
             timeline_weeks = _safe_int(request.form.get('timeline_weeks', 0) or 0, 0, 0, 52)
@@ -1706,7 +2001,7 @@ def create_roadmap():
                     flash("Unsupported file type. Upload PDF, TXT, DOCX, or image files.")
                     return redirect(url_for('dashboard.create_roadmap'))
                 filename = secure_filename(uploaded.filename)
-                unique_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
+                unique_name = f"{int(_utc_now().timestamp())}_{filename}"
                 file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_name)
                 uploaded.save(file_path)
                 ext = filename.lower()
@@ -1776,6 +2071,7 @@ def create_roadmap():
                     timeline_weeks=timeline_weeks,
                     hours_per_week=hours_per_week,
                     study_days_per_week=study_days_per_week,
+                    pace_mode=pace_mode,
                     start_date=start_date,
                     raw_text=raw_text,
                     topics="\n".join(topics),
@@ -1788,9 +2084,10 @@ def create_roadmap():
                 flash("Please provide a syllabus text or upload a file with topics.")
                 return redirect(url_for('dashboard.create_roadmap'))
 
+            raw_text = _embed_plan_preferences(raw_text, pace_mode)
             roadmap, task_ids, auto_fetch, _ = _persist_roadmap(
                 roadmap_type, title, raw_text, topics, projects, start_date, timeline_weeks,
-                hours_per_week, study_days_per_week
+                hours_per_week, study_days_per_week, pace_mode=pace_mode
             )
             if auto_fetch:
                 thread = threading.Thread(
@@ -1816,6 +2113,7 @@ def create_upsc_roadmap():
     if request.method == 'POST':
         try:
             title = request.form.get('title', '').strip() or "UPSC Mission"
+            pace_mode = _normalize_pace_mode(request.form.get('pace_mode', 'steady'))
             timeline_weeks = _safe_int(request.form.get('timeline_weeks', 0) or 0, 0, 0, 52)
             hours_per_week = _safe_int(request.form.get('hours_per_week', 6) or 6, 6, 1, 40)
             study_days_per_week = _safe_int(request.form.get('study_days_per_week', 5) or 5, 5, 1, 7)
@@ -1832,7 +2130,10 @@ def create_upsc_roadmap():
             personalization_notes = request.form.get('source_text', '').strip()
             confirmed_topics = request.form.get('confirmed_topics', '').strip()
             _, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
-            raw_text = _compose_upsc_source_text(upsc_subjects, upsc_optional_subject, upsc_focus, personalization_notes)
+            raw_text = _embed_plan_preferences(
+                _compose_upsc_source_text(upsc_subjects, upsc_optional_subject, upsc_focus, personalization_notes),
+                pace_mode
+            )
 
             if confirmed_topics:
                 topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
@@ -1851,6 +2152,7 @@ def create_upsc_roadmap():
                     timeline_weeks=timeline_weeks,
                     hours_per_week=hours_per_week,
                     study_days_per_week=study_days_per_week,
+                    pace_mode=pace_mode,
                     start_date=start_date,
                     raw_text=raw_text,
                     upsc_focus=upsc_focus,
@@ -1862,7 +2164,7 @@ def create_upsc_roadmap():
 
             roadmap, task_ids, auto_fetch, target_date = _persist_roadmap(
                 "upsc", title, raw_text, topics, projects, start_date, timeline_weeks,
-                hours_per_week, study_days_per_week, upsc_focus, upsc_optional_subject
+                hours_per_week, study_days_per_week, upsc_focus, upsc_optional_subject, pace_mode
             )
 
             if task_ids:
@@ -1945,6 +2247,13 @@ def view_roadmap(roadmap_id):
             quiz_results = QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
     today_focus = _build_today_focus(roadmap, tasks, tests)
     week_plan = _build_week_plan(tasks, tests)
+    week_changes = _build_weekly_change_summary(roadmap, tasks, tests)
+    execution_support = _build_execution_support(roadmap, tasks, tests)
+    risk_alerts = _build_risk_alerts(roadmap, tasks, tests, forecast)
+    recovery_options = _build_recovery_options(roadmap, tasks, forecast)
+    monthly_review = _build_monthly_review(roadmap, tasks, tests)
+    confidence_signals = _build_confidence_signals(roadmap, tasks)
+    outcome_artifacts = _build_outcome_artifacts(roadmap, tasks)
     resource_groups_map = {task.id: _build_resource_groups(annotated_resources_map.get(task.id, [])) for task in tasks}
     milestones = _build_milestones(roadmap, tasks, tests, done_map, attempts)
     readiness_metrics = _build_readiness_metrics(roadmap, tasks, tests, done_map, attempts, quiz_results)
@@ -1963,6 +2272,13 @@ def view_roadmap(roadmap_id):
         recent_updates=recent_updates,
         today_focus=today_focus,
         week_plan=week_plan,
+        week_changes=week_changes,
+        execution_support=execution_support,
+        risk_alerts=risk_alerts,
+        recovery_options=recovery_options,
+        monthly_review=monthly_review,
+        confidence_signals=confidence_signals,
+        outcome_artifacts=outcome_artifacts,
         milestones=milestones,
         readiness_metrics=readiness_metrics
     )
@@ -1997,7 +2313,7 @@ def update_task_status(roadmap_id, task_id):
             flash("Unsupported evidence file type.")
             return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
         filename = secure_filename(evidence.filename)
-        unique_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
+        unique_name = f"{int(_utc_now().timestamp())}_{filename}"
         storage_client = _supabase_client()
         if storage_client:
             bucket = current_app.config.get("SUPABASE_STORAGE_BUCKET", "evidence")
@@ -2018,7 +2334,7 @@ def update_task_status(roadmap_id, task_id):
             task.evidence_path = unique_name
 
     if new_status == "done":
-        task.completed_at = datetime.utcnow()
+        task.completed_at = _utc_now().replace(tzinfo=None)
     elif new_status != "done":
         task.completed_at = None
 
@@ -2041,7 +2357,7 @@ def practice(roadmap_id):
     _ensure_upsc_question_bank()
     questions = Question.query.filter_by(exam="UPSC").limit(60).all()
     attempts = {a.question_id: a for a in QuestionAttempt.query.filter_by(user_id=session['user_id']).all()}
-    current_year = datetime.utcnow().year
+    current_year = _utc_now().year
     years = list(range(current_year - 9, current_year + 1))
     completions = PyqCompletion.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).all()
     done_map = {}
@@ -2049,10 +2365,12 @@ def practice(roadmap_id):
         done_map.setdefault(c.exam, []).append(c.year)
     pyq_total = sum(len(items) for items in done_map.values())
     avg_score = round(sum(a.score for a in attempts.values()) / max(len(attempts), 1), 1) if attempts else 0.0
+    weak_areas = _build_weak_area_summary(questions, attempts)
+    practice_coach = _build_practice_coach(pyq_total, avg_score, weak_areas)
     readiness_metrics = _build_readiness_metrics(
         roadmap,
         Task.query.filter_by(roadmap_id=roadmap.id).all(),
-        MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).all(),
+        MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).all() if _has_table("mock_test_schedule") else [],
         done_map,
         attempts,
         QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all() if _has_table("quiz_result") else []
@@ -2067,6 +2385,8 @@ def practice(roadmap_id):
         done_map=done_map,
         pyq_total=pyq_total,
         avg_score=avg_score,
+        weak_areas=weak_areas,
+        practice_coach=practice_coach,
         readiness_metrics=readiness_metrics
     )
 
@@ -2133,7 +2453,8 @@ def quiz_submit(roadmap_id):
         analysis.append("Too many risky attempts. Work on elimination and selective answering.")
     if correct < max(total // 2, 4):
         analysis.append("Focus on concept revision before the next test instead of adding too many new topics.")
-    return render_template("quiz_result.html", roadmap=roadmap, result=result, accuracy=accuracy, analysis=analysis)
+    next_steps = _build_quiz_next_steps(accuracy, result)
+    return render_template("quiz_result.html", roadmap=roadmap, result=result, accuracy=accuracy, analysis=analysis, next_steps=next_steps)
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/pyq', methods=['POST'])
@@ -2177,7 +2498,7 @@ def schedule_test(roadmap_id):
     try:
         scheduled_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except Exception:
-        scheduled_date = datetime.utcnow().date()
+        scheduled_date = _utc_today()
     test = MockTestSchedule(
         title=title,
         test_type=test_type,
@@ -2302,7 +2623,7 @@ def checkin(roadmap_id):
         return redirect(url_for('dashboard.dashboard'))
     minutes = int(request.form.get('minutes', 0) or 0)
     note = request.form.get('note', '').strip() or None
-    today = date.today()
+    today = _utc_today()
     checkin = Checkin(checkin_date=today, minutes=minutes, note=note, roadmap_id=roadmap.id)
     db.session.add(checkin)
     _update_streak(roadmap, today)
@@ -2320,7 +2641,7 @@ def refresh_resources(roadmap_id, task_id):
         return redirect(url_for('dashboard.dashboard'))
 
     refresh_days = current_app.config.get("RESOURCE_REFRESH_DAYS", 7)
-    if task.last_resource_refresh and (datetime.utcnow() - task.last_resource_refresh).days < refresh_days:
+    if task.last_resource_refresh and (_utc_now().replace(tzinfo=None) - task.last_resource_refresh).days < refresh_days:
         flash("Resources were refreshed recently. Try again later.")
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
@@ -2338,7 +2659,7 @@ def refresh_resources(roadmap_id, task_id):
             score=res.get("score", 0.95 if roadmap.roadmap_type == "upsc" else 0.0),
             task_id=task.id
         ))
-    task.last_resource_refresh = datetime.utcnow()
+    task.last_resource_refresh = _utc_now().replace(tzinfo=None)
     db.session.commit()
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
@@ -2432,7 +2753,7 @@ def rebalance(roadmap_id):
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
     timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
-    _auto_adjust_roadmap_timeline(roadmap, start_date=datetime.utcnow().date(), timeline_weeks=timeline_weeks)
+    _auto_adjust_roadmap_timeline(roadmap, start_date=_utc_today(), timeline_weeks=timeline_weeks)
     db.session.commit()
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
@@ -2625,9 +2946,9 @@ def _build_upsc_dashboard_data(tasks, tests):
 
 
 def _persist_roadmap(roadmap_type, title, raw_text, topics, projects, start_date, timeline_weeks,
-                     hours_per_week, study_days_per_week, upsc_focus="", upsc_optional_subject=""):
+                     hours_per_week, study_days_per_week, upsc_focus="", upsc_optional_subject="", pace_mode="steady"):
     task_specs, total_hours, computed_end = _build_tasks(
-        roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week
+        roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week, pace_mode
     )
     target_date = computed_end
 

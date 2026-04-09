@@ -71,6 +71,14 @@
                 Study days per week
                 <input type="number" name="study_days_per_week" min="1" max="7" value="6">
             </label>
+            <label>
+                Mission intensity
+                <select name="pace_mode">
+                    <option value="steady">Steady and sustainable</option>
+                    <option value="burnout_safe">Burnout-safe</option>
+                    <option value="sprint">Fast-track</option>
+                </select>
+            </label>
         </div>
         <label>
             Optional subject
@@ -95,7 +103,7 @@
             Notes for personalization
             <textarea name="source_text" rows="5" placeholder="Optional: mention attempt year, weak areas, current level, job/college constraints, or optional-subject concerns."></textarea>
         </label>
-        <button type="submit">Generate UPSC Mission</button>
+        <button type="submit">Generate UPSC Mission Blueprint</button>
     </form>
 </section>
 {% endblock %}

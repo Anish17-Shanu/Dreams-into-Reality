@@ -71,6 +71,7 @@ class DreamsIntoRealitySmokeTests(unittest.TestCase):
                 "timeline_weeks": "4",
                 "hours_per_week": "6",
                 "study_days_per_week": "5",
+                "pace_mode": "steady",
             },
             follow_redirects=True,
         )
@@ -78,6 +79,8 @@ class DreamsIntoRealitySmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Math Sprint", body)
         self.assertIn("Tasks", body)
+        self.assertIn("Recovery Options", body)
+        self.assertIn("Risk Radar", body)
 
     def test_view_roadmap_degrades_if_optional_tables_are_missing(self):
         self._register_and_login()
@@ -100,6 +103,41 @@ class DreamsIntoRealitySmokeTests(unittest.TestCase):
         body = response.get_data(as_text=True)
         self.assertEqual(response.status_code, 200)
         self.assertIn("Career Clarity", body)
+
+    def test_upsc_practice_and_quiz_result_surfaces_render(self):
+        self._register_and_login()
+        create_response = self.client.post(
+            "/upsc/new",
+            data={
+                "title": "UPSC System",
+                "upsc_focus": "full_journey",
+                "timeline_weeks": "8",
+                "hours_per_week": "10",
+                "study_days_per_week": "6",
+                "pace_mode": "steady",
+                "confirmed_topics": "UPSC exam strategy and attempt planning\nNCERT foundation build-up",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(create_response.status_code, 302)
+        roadmap_path = create_response.headers["Location"]
+        roadmap_id = roadmap_path.rsplit("/", 1)[-1]
+
+        practice_response = self.client.get(f"/roadmap/{roadmap_id}/practice", follow_redirects=True)
+        practice_body = practice_response.get_data(as_text=True)
+        self.assertEqual(practice_response.status_code, 200)
+        self.assertIn("Weak-Area Radar", practice_body)
+        self.assertIn("Practice Coach", practice_body)
+
+        quiz_submit = self.client.post(
+            f"/roadmap/{roadmap_id}/quiz/submit",
+            data={"total": "2", "q_0": "A", "a_0": "A", "q_1": "B", "a_1": "C"},
+            follow_redirects=True,
+        )
+        quiz_body = quiz_submit.get_data(as_text=True)
+        self.assertEqual(quiz_submit.status_code, 200)
+        self.assertIn("Quiz Analysis", quiz_body)
+        self.assertIn("Best next step", quiz_body)
 
 
 if __name__ == "__main__":
