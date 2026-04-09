@@ -152,6 +152,33 @@ create table if not exists quiz_result (
 
 create index if not exists idx_quiz_user on quiz_result(user_id);
 
+create table if not exists quiz_question (
+  id bigserial primary key,
+  question_text text not null,
+  options_json text not null,
+  correct_answer text not null,
+  category varchar(180),
+  source varchar(80),
+  difficulty varchar(20) default 'medium',
+  mode varchar(20) default 'standard',
+  created_at timestamp without time zone default now(),
+  user_id bigint not null references "user"(id) on delete cascade,
+  roadmap_id bigint not null references roadmap(id) on delete cascade
+);
+
+create index if not exists idx_quiz_question_user_roadmap on quiz_question(user_id, roadmap_id);
+
+create table if not exists quiz_question_attempt (
+  id bigserial primary key,
+  selected_answer text,
+  is_correct boolean default false,
+  created_at timestamp without time zone default now(),
+  quiz_result_id bigint not null references quiz_result(id) on delete cascade,
+  question_id bigint not null references quiz_question(id) on delete cascade
+);
+
+create index if not exists idx_quiz_attempt_result on quiz_question_attempt(quiz_result_id);
+
 create index if not exists idx_question_exam on question(exam);
 create index if not exists idx_attempt_user on question_attempt(user_id);
 
@@ -176,6 +203,8 @@ alter table question_attempt enable row level security;
 alter table pyq_completion enable row level security;
 alter table mock_test_schedule enable row level security;
 alter table quiz_result enable row level security;
+alter table quiz_question enable row level security;
+alter table quiz_question_attempt enable row level security;
 
 revoke all on table "user" from anon, authenticated;
 revoke all on table roadmap from anon, authenticated;
@@ -188,6 +217,8 @@ revoke all on table question_attempt from anon, authenticated;
 revoke all on table pyq_completion from anon, authenticated;
 revoke all on table mock_test_schedule from anon, authenticated;
 revoke all on table quiz_result from anon, authenticated;
+revoke all on table quiz_question from anon, authenticated;
+revoke all on table quiz_question_attempt from anon, authenticated;
 
 -- If you later want public API access for selected records, add explicit RLS
 -- policies then grant only the minimum required privileges back.

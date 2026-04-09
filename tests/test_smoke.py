@@ -154,6 +154,7 @@ class DreamsIntoRealitySmokeTests(unittest.TestCase):
         self.assertEqual(weekly_quiz.status_code, 200)
         self.assertIn("Weekly assessment focus", weekly_body)
         self.assertIn("Source:", weekly_body)
+        self.assertIn("name=\"qid_0\"", weekly_body)
 
     def test_demo_and_text_exports_render(self):
         self._register_and_login()

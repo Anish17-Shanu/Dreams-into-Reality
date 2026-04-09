@@ -64,7 +64,11 @@
         {% for q in questions %}
             <article class="question-card">
                 <h3>{{ loop.index }}. {{ q.question | safe }}</h3>
+                {% if q.id %}
+                <input type="hidden" name="qid_{{ loop.index0 }}" value="{{ q.id }}">
+                {% else %}
                 <input type="hidden" name="a_{{ loop.index0 }}" value="{{ q.answer }}">
+                {% endif %}
                 {% if q.category or q.source %}
                 <p class="muted">Topic: {{ q.category or 'General' }}{% if q.source %} | Source: {{ q.source }}{% endif %}</p>
                 {% endif %}

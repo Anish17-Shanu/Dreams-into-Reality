@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, session, url_for, current_app, flash, send_file
 from extensions import db
-from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin, Question, QuestionAttempt, PyqCompletion, MockTestSchedule, QuizResult
+from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin, Question, QuestionAttempt, PyqCompletion, MockTestSchedule, QuizResult, QuizQuestion, QuizQuestionAttempt
 from datetime import datetime, timedelta, date, UTC
 from werkzeug.utils import secure_filename
 from urllib.parse import quote
@@ -8,6 +8,7 @@ import os
 import re
 import csv
 import io
+import json
 import math
 import random
 import requests
@@ -65,6 +66,32 @@ def _has_mock_test_schedule_schema():
             "created_at",
             "roadmap_id",
         },
+    )
+
+
+def _has_quiz_question_schema():
+    return _has_columns(
+        "quiz_question",
+        {
+            "id",
+            "question_text",
+            "options_json",
+            "correct_answer",
+            "category",
+            "source",
+            "difficulty",
+            "mode",
+            "created_at",
+            "user_id",
+            "roadmap_id",
+        },
+    )
+
+
+def _has_quiz_question_attempt_schema():
+    return _has_columns(
+        "quiz_question_attempt",
+        {"id", "selected_answer", "is_correct", "created_at", "quiz_result_id", "question_id"},
     )
 
 
@@ -1902,6 +1929,45 @@ def _build_assessment_questions(roadmap, tasks, amount=10, difficulty="medium", 
     return (external or contextual)[:amount], focus_topics
 
 
+def _persist_quiz_questions(roadmap, questions, difficulty, mode):
+    if not _has_quiz_question_schema():
+        return questions
+    persisted = []
+    for item in questions:
+        row = QuizQuestion(
+            question_text=(item.get("question") or "").strip(),
+            options_json=json.dumps(item.get("options") or []),
+            correct_answer=(item.get("answer") or "").strip(),
+            category=(item.get("category") or "")[:180] or None,
+            source=(item.get("source") or "generated")[:80],
+            difficulty=difficulty,
+            mode=mode,
+            user_id=session["user_id"],
+            roadmap_id=roadmap.id,
+        )
+        db.session.add(row)
+        db.session.flush()
+        persisted.append(
+            {
+                "id": row.id,
+                "question": row.question_text,
+                "options": json.loads(row.options_json),
+                "category": row.category,
+                "source": row.source,
+            }
+        )
+    # Keep the table lean for each user/roadmap pair.
+    stale = QuizQuestion.query.filter(
+        QuizQuestion.user_id == session["user_id"],
+        QuizQuestion.roadmap_id == roadmap.id,
+        QuizQuestion.id.not_in([item["id"] for item in persisted]),
+    ).order_by(QuizQuestion.created_at.asc()).limit(300).all()
+    for row in stale:
+        db.session.delete(row)
+    db.session.commit()
+    return persisted
+
+
 def _build_risk_alerts(roadmap, tasks, tests, forecast):
     alerts = []
     today = _utc_today()
@@ -3137,10 +3203,11 @@ def quiz(roadmap_id):
     if difficulty not in {"easy", "medium", "hard"}:
         difficulty = "medium"
     tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
-    questions, focus_topics = _build_assessment_questions(roadmap, tasks, amount=amount, difficulty=difficulty, mode=mode)
-    if not questions:
+    raw_questions, focus_topics = _build_assessment_questions(roadmap, tasks, amount=amount, difficulty=difficulty, mode=mode)
+    if not raw_questions:
         flash("Quiz generator is busy. Try again in a minute.")
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+    questions = _persist_quiz_questions(roadmap, raw_questions, difficulty, mode) if _has_quiz_question_schema() else raw_questions
     recent_results = QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
     return render_template("quiz.html", roadmap=roadmap, questions=questions, recent_results=recent_results, selected_amount=amount, selected_difficulty=difficulty, mode=mode, focus_topics=focus_topics)
 
@@ -3154,11 +3221,36 @@ def quiz_submit(roadmap_id):
     total = int(request.form.get("total", 0))
     correct = 0
     incorrect = 0
+    answer_rows = []
+    question_map = {}
+    if _has_quiz_question_schema():
+        question_ids = []
+        for idx in range(total):
+            qid = request.form.get(f"qid_{idx}")
+            if qid and qid.isdigit():
+                question_ids.append(int(qid))
+        if question_ids:
+            question_map = {
+                item.id: item
+                for item in QuizQuestion.query.filter(
+                    QuizQuestion.id.in_(question_ids),
+                    QuizQuestion.user_id == session["user_id"],
+                    QuizQuestion.roadmap_id == roadmap.id,
+                ).all()
+            }
     for idx in range(total):
         selected = request.form.get(f"q_{idx}")
-        answer = request.form.get(f"a_{idx}")
         if not selected:
             continue
+        answer = None
+        question_id = request.form.get(f"qid_{idx}")
+        if question_id and question_id.isdigit() and question_map:
+            row = question_map.get(int(question_id))
+            if row:
+                answer = row.correct_answer
+                answer_rows.append((row.id, selected, selected == answer))
+        if answer is None:
+            answer = request.form.get(f"a_{idx}")
         if selected == answer:
             correct += 1
         else:
@@ -3174,6 +3266,17 @@ def quiz_submit(roadmap_id):
         roadmap_id=roadmap.id
     )
     db.session.add(result)
+    db.session.flush()
+    if _has_quiz_question_attempt_schema():
+        for question_id, selected, is_correct in answer_rows:
+            db.session.add(
+                QuizQuestionAttempt(
+                    selected_answer=selected,
+                    is_correct=is_correct,
+                    quiz_result_id=result.id,
+                    question_id=question_id,
+                )
+            )
     db.session.commit()
     analysis = []
     if accuracy >= 75:

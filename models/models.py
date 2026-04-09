@@ -138,3 +138,26 @@ class QuizResult(db.Model):
     attempted_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     roadmap_id = db.Column(db.Integer, db.ForeignKey('roadmap.id'), nullable=False)
+
+
+class QuizQuestion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    question_text = db.Column(db.Text, nullable=False)
+    options_json = db.Column(db.Text, nullable=False)
+    correct_answer = db.Column(db.Text, nullable=False)
+    category = db.Column(db.String(180), nullable=True)
+    source = db.Column(db.String(80), nullable=True)
+    difficulty = db.Column(db.String(20), default="medium")
+    mode = db.Column(db.String(20), default="standard")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    roadmap_id = db.Column(db.Integer, db.ForeignKey('roadmap.id'), nullable=False)
+
+
+class QuizQuestionAttempt(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    selected_answer = db.Column(db.Text, nullable=True)
+    is_correct = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    quiz_result_id = db.Column(db.Integer, db.ForeignKey('quiz_result.id'), nullable=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('quiz_question.id'), nullable=False)
