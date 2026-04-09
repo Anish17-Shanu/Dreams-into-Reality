@@ -9,6 +9,7 @@ import re
 import csv
 import io
 import math
+import random
 import requests
 import threading
 from supabase import create_client
@@ -1120,11 +1121,13 @@ def _fetch_opentdb_questions(amount=10, difficulty="medium"):
         correct = item.get("correct_answer")
         incorrect = item.get("incorrect_answers", [])
         options = incorrect + [correct]
+        random.shuffle(options)
         questions.append({
             "question": question,
             "options": options,
             "answer": correct,
-            "category": item.get("category")
+            "category": item.get("category"),
+            "source": "Open Trivia DB",
         })
     return questions
 
@@ -1557,6 +1560,260 @@ def _build_monthly_review(roadmap, tasks, tests):
         "headline": "Strong month of execution." if len(completed) >= 4 else "Your system still has room to tighten.",
         "summary": "You are turning plans into output." if len(completed) >= 4 else "A steadier weekly rhythm will make the roadmap feel much lighter.",
     }
+
+
+def _base_task_topic(task_title):
+    cleaned = re.sub(r"^(Project:\s*|Revision Sprint:\s*|Weak-area recovery:\s*)", "", task_title or "", flags=re.IGNORECASE)
+    return cleaned.strip()
+
+
+def _build_revision_engine(roadmap, tasks):
+    today = _utc_today()
+    revision_queue = []
+    revision_tasks = [task for task in tasks if "revision" in _normalize(task.title)]
+    done_revision = [task for task in revision_tasks if task.status == "done"]
+
+    for task in tasks:
+        if task.status != "done":
+            if "revision" in _normalize(task.title) and task.due_date and task.due_date <= today + timedelta(days=3):
+                revision_queue.append({
+                    "title": task.title,
+                    "reason": "This revision block is coming up soon and should stay protected.",
+                    "urgency": "soon",
+                })
+            continue
+        if not task.completed_at:
+            continue
+        days_since = (today - task.completed_at.date()).days
+        if days_since in {1, 3, 7, 14}:
+            revision_queue.append({
+                "title": f"Revise {_base_task_topic(task.title)}",
+                "reason": f"Spaced repetition checkpoint for day {days_since}.",
+                "urgency": "due" if days_since in {3, 7} else "light",
+            })
+
+    days_left = (roadmap.target_date - today).days
+    pre_exam_mode = days_left <= 21
+    effectiveness = round((len(done_revision) / max(len(revision_tasks), 1)) * 100) if revision_tasks else 0
+    return {
+        "headline": "Pre-exam revision mode" if pre_exam_mode else "Rolling revision queue",
+        "detail": "The next three weeks should prioritize high-yield recall, short tests, and clean review loops." if pre_exam_mode else "Revise before forgetting, not only when panic starts.",
+        "queue": revision_queue[:6],
+        "effectiveness": effectiveness,
+        "pre_exam_mode": pre_exam_mode,
+    }
+
+
+def _build_accountability_loop(roadmap, tasks):
+    today = _utc_today()
+    recent_checkins = []
+    if _has_table("checkin"):
+        recent_checkins = Checkin.query.filter_by(roadmap_id=roadmap.id).order_by(Checkin.created_at.desc()).limit(7).all()
+    days_since = (today - roadmap.last_checkin_date).days if roadmap.last_checkin_date else None
+    weekly_minutes = sum(item.minutes or 0 for item in recent_checkins)
+    open_tasks = [task for task in tasks if task.status != "done"]
+    reflection_prompt = "What is the one thing that made progress feel heavier than it should have this week?"
+    if open_tasks and open_tasks[0].difficulty == "hard":
+        reflection_prompt = "Did the current hard task need a smaller first step instead of more pressure?"
+    return {
+        "headline": "Re-entry support" if days_since is not None and days_since >= 3 else "Accountability loop",
+        "detail": "Come back through one 25-minute session, one easy win, and one honest check-in." if days_since is not None and days_since >= 3 else "Small weekly reflections and confidence checks make the roadmap adapt faster.",
+        "weekly_minutes": weekly_minutes,
+        "days_since": days_since,
+        "reflection_prompt": reflection_prompt,
+        "confidence_prompt": "Are you confident or just busy this week?",
+        "load_prompt": "Did the workload feel manageable, heavy, or overloaded?",
+    }
+
+
+def _build_career_outcomes(roadmap, tasks):
+    if roadmap.roadmap_type != "career":
+        return None
+    project_tasks = [task for task in tasks if task.title.startswith("Project:")]
+    proof_tasks = [task for task in tasks if any(marker in _normalize(task.title) for marker in ["portfolio", "resume", "interview", "proof", "job-ready", "case study"])]
+    completed_projects = len([task for task in project_tasks if task.status == "done"])
+    completed_proof = len([task for task in proof_tasks if task.status == "done"])
+    portfolio_meter = round((completed_projects / max(len(project_tasks), 1)) * 100) if project_tasks else 0
+    readiness = round(((completed_projects * 0.5) + (completed_proof * 0.5)) / max(len(project_tasks) + len(proof_tasks), 1) * 100)
+    return {
+        "portfolio_meter": portfolio_meter,
+        "job_readiness": readiness,
+        "project_submission": [task for task in project_tasks[:4]],
+        "proof_artifacts": [task for task in proof_tasks[:4]],
+        "interview_flow": [
+            "Complete one project and capture the challenge, solution, and result.",
+            "Turn finished work into a resume bullet with a measurable outcome.",
+            "Practice explaining one hard task as an interview story.",
+        ],
+    }
+
+
+def _build_upsc_mode_details(roadmap, tasks, tests, attempt_history, quiz_results):
+    if roadmap.roadmap_type != "upsc":
+        return None
+    optional_subject = _extract_optional_subject_from_source_text(roadmap.source_text)
+    completed_tests = [test for test in tests if test.status == "completed"]
+    avg_test_score = round(sum((test.score or 0) for test in completed_tests) / max(len(completed_tests), 1), 1) if completed_tests else 0
+    answer_reviews = []
+    question_map = {}
+    if attempt_history and _has_table("question"):
+        question_ids = [item.question_id for item in attempt_history]
+        question_map = {item.id: item for item in Question.query.filter(Question.id.in_(question_ids)).all()}
+    for item in attempt_history[:5]:
+        question = question_map.get(item.question_id)
+        answer_reviews.append({
+            "topic": question.topic if question and question.topic else question.subject if question and question.subject else "UPSC practice",
+            "score": item.score,
+            "note": item.notes or "No review note yet.",
+        })
+    current_affairs = [task.title for task in tasks if "current affairs" in _normalize(task.title)][:4]
+    return {
+        "optional_subject": optional_subject or "Not selected yet",
+        "completed_tests": len(completed_tests),
+        "planned_tests": len([test for test in tests if test.status == "planned"]),
+        "avg_test_score": avg_test_score,
+        "answer_reviews": answer_reviews,
+        "current_affairs": current_affairs or ["Issue-based current affairs mapping", "Daily current affairs notes and weekly revision"],
+    }
+
+
+def _build_analytics_snapshot(roadmap, tasks, attempts, quiz_results):
+    checkins = []
+    if _has_table("checkin"):
+        checkins = Checkin.query.filter_by(roadmap_id=roadmap.id).all()
+    week_minutes = {}
+    for item in checkins:
+        week_key = item.checkin_date - timedelta(days=item.checkin_date.weekday())
+        week_minutes.setdefault(week_key, 0)
+        week_minutes[week_key] += item.minutes or 0
+    sorted_weeks = sorted(week_minutes.items())
+    trend = "Rising" if len(sorted_weeks) >= 2 and sorted_weeks[-1][1] >= sorted_weeks[-2][1] else "Uneven"
+
+    strongest_topic = None
+    weakest_topic = None
+    if attempts:
+        topic_scores = {}
+        for attempt in attempts.values():
+            question = getattr(attempt, "question", None)
+            topic = (question.topic if question and question.topic else question.subject if question and question.subject else "General practice")
+            topic_scores.setdefault(topic, []).append(attempt.score)
+        if topic_scores:
+            ranked = sorted(((topic, sum(scores) / len(scores)) for topic, scores in topic_scores.items()), key=lambda item: item[1], reverse=True)
+            strongest_topic = ranked[0][0]
+            weakest_topic = ranked[-1][0]
+
+    if not strongest_topic:
+        completed = [task for task in tasks if task.status == "done"]
+        strongest_topic = _base_task_topic(completed[0].title) if completed else "Still forming"
+    if not weakest_topic:
+        overdue = [task for task in tasks if task.status != "done" and task.due_date and task.due_date < _utc_today()]
+        weakest_topic = _base_task_topic(overdue[0].title) if overdue else "No critical weak pocket"
+
+    best_day = None
+    if checkins:
+        day_totals = {}
+        for item in checkins:
+            day_name = item.checkin_date.strftime("%A")
+            day_totals.setdefault(day_name, 0)
+            day_totals[day_name] += item.minutes or 0
+        best_day = max(day_totals.items(), key=lambda pair: pair[1])[0]
+
+    revision_tasks = [task for task in tasks if "revision" in _normalize(task.title)]
+    revision_effectiveness = round((len([task for task in revision_tasks if task.status == "done"]) / max(len(revision_tasks), 1)) * 100) if revision_tasks else 0
+    delayed = [task for task in tasks if task.status != "done" and task.due_date and task.due_date < _utc_today()]
+    delay_pattern = f"{len(delayed)} overdue task(s), with {delayed[0].difficulty if delayed else 'no'} dominant delay pattern."
+    quiz_trend = round(sum((item.correct / max(item.total_questions, 1)) for item in quiz_results) / len(quiz_results) * 100) if quiz_results else 0
+    return {
+        "trend": trend,
+        "strongest_topic": strongest_topic,
+        "weakest_topic": weakest_topic,
+        "best_day": best_day or "Not enough data yet",
+        "delay_pattern": delay_pattern,
+        "revision_effectiveness": revision_effectiveness,
+        "quiz_trend": quiz_trend,
+    }
+
+
+def _build_public_examples():
+    return [
+        {"title": "Semester rescue", "detail": "Messy syllabus became a clean week-by-week plan with revision buffers and assessment checkpoints."},
+        {"title": "Career launch path", "detail": "Role learning now ends in portfolio proof, resume bullets, and interview-ready stories."},
+        {"title": "UPSC mission system", "detail": "Stage-separated prep with PYQ work, answer-review history, and current-affairs structure."},
+    ]
+
+
+def _build_case_studies():
+    return [
+        {"title": "Before", "detail": "Users start with overwhelm, vague effort, and no reliable next step."},
+        {"title": "After", "detail": "They leave with a daily task, revision queue, weekly assessment, and visible proof of progress."},
+        {"title": "Why it matters", "detail": "The product stops being a roadmap generator and becomes a completion system."},
+    ]
+
+
+def _build_weekly_focus_topics(tasks):
+    today = _utc_today()
+    week_end = today + timedelta(days=7)
+    topics = []
+    for task in tasks:
+        if task.status == "done":
+            continue
+        if task.due_date and task.due_date > week_end:
+            continue
+        topic = _base_task_topic(task.title)
+        if topic and topic not in topics:
+            topics.append(topic)
+    return topics[:6]
+
+
+def _generate_contextual_questions(topics, amount, roadmap_type="syllabus"):
+    question_bank = []
+    for topic in topics[:amount]:
+        if roadmap_type == "career":
+            correct = "Build or explain a concrete proof artifact"
+            options = [
+                correct,
+                "Keep collecting more random tutorials",
+                "Skip practice until the full roadmap ends",
+                "Avoid measurable outputs for now",
+            ]
+        elif roadmap_type == "upsc":
+            correct = "Revise the issue, attempt a short answer, and review the weak spot"
+            options = [
+                correct,
+                "Keep reading without testing retention",
+                "Ignore PYQs for the topic",
+                "Add three new sources before revision",
+            ]
+        else:
+            correct = "Review the concept, solve one application, and note the mistake pattern"
+            options = [
+                correct,
+                "Only reread the title and move on",
+                "Skip revision because the topic is already scheduled",
+                "Wait until the final week to revisit it",
+            ]
+        random.shuffle(options)
+        question_bank.append({
+            "question": f"What is the strongest next move to assess progress on {topic}?",
+            "options": options,
+            "answer": correct,
+            "category": topic,
+            "source": "Roadmap context",
+        })
+    return question_bank[:amount]
+
+
+def _build_assessment_questions(roadmap, tasks, amount=10, difficulty="medium", mode="standard"):
+    focus_topics = _build_weekly_focus_topics(tasks)
+    contextual = _generate_contextual_questions(focus_topics or [_base_task_topic(task.title) for task in tasks[:5]], amount, roadmap.roadmap_type)
+    if mode == "weekly":
+        external = _fetch_opentdb_questions(amount=max(3, amount // 2), difficulty=difficulty)
+        combined = contextual[: max(amount - len(external), 0)] + external[: amount - min(len(contextual), amount)]
+        while len(combined) < amount:
+            combined.extend(_generate_contextual_questions(focus_topics or ["Core review"], amount - len(combined), roadmap.roadmap_type))
+        return combined[:amount], focus_topics
+    external = _fetch_opentdb_questions(amount=amount, difficulty=difficulty)
+    return (external or contextual)[:amount], focus_topics
 
 
 def _build_risk_alerts(roadmap, tasks, tests, forecast):
@@ -2280,7 +2537,7 @@ def home():
         {"title": "Frontend career launch", "detail": "Skills, portfolio proof, resume bullets, and interview prep checkpoints."},
         {"title": "Semester syllabus planner", "detail": "Turn a noisy syllabus into a calm weekly execution plan."},
     ]
-    return render_template('home.html', demo_cards=demo_cards)
+    return render_template('home.html', demo_cards=demo_cards, public_examples=_build_public_examples(), case_studies=_build_case_studies())
 
 
 @dashboard_bp.route('/demo')
@@ -2625,6 +2882,12 @@ def view_roadmap(roadmap_id):
     quality_report = _build_plan_quality_report(roadmap, tasks)
     milestone_timeline = _build_milestone_timeline(tasks)
     progress_story = _build_progress_story(roadmap, attempts, quiz_results)
+    revision_engine = _build_revision_engine(roadmap, tasks)
+    accountability_loop = _build_accountability_loop(roadmap, tasks)
+    career_outcomes = _build_career_outcomes(roadmap, tasks)
+    attempt_history = QuestionAttempt.query.filter_by(user_id=session['user_id']).order_by(QuestionAttempt.attempted_at.desc()).limit(8).all() if roadmap.roadmap_type == "upsc" and _has_table("question_attempt") else []
+    upsc_mode = _build_upsc_mode_details(roadmap, tasks, tests, attempt_history, quiz_results)
+    analytics_snapshot = _build_analytics_snapshot(roadmap, tasks, attempts, quiz_results)
     resource_groups_map = {task.id: _build_resource_groups(annotated_resources_map.get(task.id, [])) for task in tasks}
     milestones = _build_milestones(roadmap, tasks, tests, done_map, attempts)
     readiness_metrics = _build_readiness_metrics(roadmap, tasks, tests, done_map, attempts, quiz_results)
@@ -2654,6 +2917,11 @@ def view_roadmap(roadmap_id):
         quality_report=quality_report,
         milestone_timeline=milestone_timeline,
         progress_story=progress_story,
+        revision_engine=revision_engine,
+        accountability_loop=accountability_loop,
+        career_outcomes=career_outcomes,
+        upsc_mode=upsc_mode,
+        analytics_snapshot=analytics_snapshot,
         milestones=milestones,
         readiness_metrics=readiness_metrics
     )
@@ -2777,14 +3045,18 @@ def quiz(roadmap_id):
         return redirect(url_for('dashboard.dashboard'))
     amount = _safe_int(request.args.get("amount", 10), 10, 5, 20)
     difficulty = request.args.get("difficulty", "medium")
+    mode = request.args.get("mode", "standard")
+    if mode not in {"standard", "weekly"}:
+        mode = "standard"
     if difficulty not in {"easy", "medium", "hard"}:
         difficulty = "medium"
-    questions = _fetch_opentdb_questions(amount=amount, difficulty=difficulty)
+    tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+    questions, focus_topics = _build_assessment_questions(roadmap, tasks, amount=amount, difficulty=difficulty, mode=mode)
     if not questions:
         flash("Quiz generator is busy. Try again in a minute.")
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
     recent_results = QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
-    return render_template("quiz.html", roadmap=roadmap, questions=questions, recent_results=recent_results, selected_amount=amount, selected_difficulty=difficulty)
+    return render_template("quiz.html", roadmap=roadmap, questions=questions, recent_results=recent_results, selected_amount=amount, selected_difficulty=difficulty, mode=mode, focus_topics=focus_topics)
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/quiz/submit', methods=['POST'])

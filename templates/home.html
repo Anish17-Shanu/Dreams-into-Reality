@@ -67,6 +67,26 @@
     </article>
 </section>
 
+{% if public_examples %}
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Public Product Examples</h2>
+            <p class="muted">The strongest products show what “better” actually looks like.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        {% for item in public_examples %}
+        <article class="card soft-card">
+            <p class="eyebrow">Example</p>
+            <h3>{{ item.title }}</h3>
+            <p class="muted">{{ item.detail }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
 {% if demo_cards %}
 <section class="panel">
     <div class="panel-header panel-header-start">
@@ -80,6 +100,26 @@
         {% for item in demo_cards %}
         <article class="card soft-card">
             <p class="eyebrow">Sample</p>
+            <h3>{{ item.title }}</h3>
+            <p class="muted">{{ item.detail }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if case_studies %}
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Before And After</h2>
+            <p class="muted">Trust grows when users can see how the product changes the working experience.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        {% for item in case_studies %}
+        <article class="card soft-card">
+            <p class="eyebrow">Case</p>
             <h3>{{ item.title }}</h3>
             <p class="muted">{{ item.detail }}</p>
         </article>

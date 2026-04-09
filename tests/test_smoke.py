@@ -84,6 +84,9 @@ class DreamsIntoRealitySmokeTests(unittest.TestCase):
         self.assertIn("Plan Quality Control", body)
         self.assertIn("Focus Session", body)
         self.assertIn("Monthly review", body)
+        self.assertIn("Revision Engine", body)
+        self.assertIn("Analytics", body)
+        self.assertIn("Accountability Loop", body)
 
     def test_view_roadmap_degrades_if_optional_tables_are_missing(self):
         self._register_and_login()
@@ -142,6 +145,15 @@ class DreamsIntoRealitySmokeTests(unittest.TestCase):
         self.assertEqual(quiz_submit.status_code, 200)
         self.assertIn("Quiz Analysis", quiz_body)
         self.assertIn("Best next step", quiz_body)
+
+        weekly_quiz = self.client.get(
+            f"/roadmap/{roadmap_id}/quiz?mode=weekly&amount=5&difficulty=medium",
+            follow_redirects=True,
+        )
+        weekly_body = weekly_quiz.get_data(as_text=True)
+        self.assertEqual(weekly_quiz.status_code, 200)
+        self.assertIn("Weekly assessment focus", weekly_body)
+        self.assertIn("Source:", weekly_body)
 
     def test_demo_and_text_exports_render(self):
         self._register_and_login()

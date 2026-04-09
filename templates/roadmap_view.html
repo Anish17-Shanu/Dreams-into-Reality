@@ -195,6 +195,7 @@
                 {% if roadmap.roadmap_type == 'upsc' %}
                 <a class="ghost" href="{{ url_for('dashboard.practice', roadmap_id=roadmap.id) }}">Practice Vault</a>
                 <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">Quick Quiz</a>
+                <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id, mode='weekly') }}">Weekly assessment</a>
                 {% endif %}
                 <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>
                 <a class="ghost" href="{{ url_for('dashboard.export_ics', roadmap_id=roadmap.id) }}">Export Calendar</a>
@@ -262,6 +263,67 @@
 <section class="panel">
     <div class="panel-header panel-header-start">
         <div>
+            <h2>Revision Engine</h2>
+            <p class="muted">Spaced repetition, revision queues, and pre-exam focus should happen automatically, not from memory.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        <article class="card soft-card">
+            <p class="eyebrow">Revision mode</p>
+            <h3>{{ revision_engine.headline }}</h3>
+            <p class="muted">{{ revision_engine.detail }}</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Effectiveness</p>
+            <h3>{{ revision_engine.effectiveness }}%</h3>
+            <p class="muted">Based on how many explicit revision tasks have actually been completed.</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Revise next</p>
+            <div class="simple-list">
+                {% for item in revision_engine.queue %}
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <p class="muted">{{ item.reason }}</p>
+                </div>
+                {% else %}
+                <div><p class="muted">No urgent revision item yet. Keep the queue healthy by finishing the next review block on time.</p></div>
+                {% endfor %}
+            </div>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Accountability Loop</h2>
+            <p class="muted">This system should help people return, reflect, and keep moving when life interrupts.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        <article class="card soft-card">
+            <p class="eyebrow">Mode</p>
+            <h3>{{ accountability_loop.headline }}</h3>
+            <p class="muted">{{ accountability_loop.detail }}</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Weekly load</p>
+            <h3>{{ accountability_loop.weekly_minutes }} min</h3>
+            <p class="muted">Days since last check-in: {{ accountability_loop.days_since if accountability_loop.days_since is not none else 'No history yet' }}</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Reflection</p>
+            <p class="muted">{{ accountability_loop.reflection_prompt }}</p>
+            <p class="muted">{{ accountability_loop.confidence_prompt }}</p>
+            <p class="muted">{{ accountability_loop.load_prompt }}</p>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
             <h2>Progress Story</h2>
             <p class="muted">Growth should feel visible, not just numerical.</p>
         </div>
@@ -274,6 +336,32 @@
             <p class="muted">{{ item }}</p>
         </article>
         {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Analytics</h2>
+            <p class="muted">Users should feel what is improving, what is slipping, and which pattern needs attention.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        <article class="card soft-card">
+            <p class="eyebrow">Consistency trend</p>
+            <h3>{{ analytics_snapshot.trend }}</h3>
+            <p class="muted">Best study day: {{ analytics_snapshot.best_day }}</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Topic pattern</p>
+            <h3>{{ analytics_snapshot.strongest_topic }}</h3>
+            <p class="muted">Weakest topic: {{ analytics_snapshot.weakest_topic }}</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Delay and revision</p>
+            <h3>{{ analytics_snapshot.revision_effectiveness }}%</h3>
+            <p class="muted">{{ analytics_snapshot.delay_pattern }}</p>
+        </article>
     </div>
 </section>
 
@@ -294,6 +382,109 @@
         {% endfor %}
     </div>
 </section>
+
+{% if career_outcomes %}
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Career Outcome System</h2>
+            <p class="muted">A career roadmap should end in employability, not just study completion.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        <article class="card soft-card">
+            <p class="eyebrow">Portfolio meter</p>
+            <h3>{{ career_outcomes.portfolio_meter }}%</h3>
+            <p class="muted">Measures how much visible project proof is complete.</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Job readiness</p>
+            <h3>{{ career_outcomes.job_readiness }}%</h3>
+            <p class="muted">Built from project delivery plus proof-oriented career tasks.</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Interview workflow</p>
+            <div class="simple-list">
+                {% for item in career_outcomes.interview_flow %}
+                <div><p class="muted">{{ item }}</p></div>
+                {% endfor %}
+            </div>
+        </article>
+    </div>
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Project Submission Tracker</h3>
+            <div class="simple-list">
+                {% for item in career_outcomes.project_submission %}
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <p class="muted">Status: {{ item.status|replace('_', ' ')|title }}</p>
+                </div>
+                {% else %}
+                <div><p class="muted">No project submissions tracked yet.</p></div>
+                {% endfor %}
+            </div>
+        </article>
+        <article class="card soft-card">
+            <h3>Proof Artifacts</h3>
+            <div class="simple-list">
+                {% for item in career_outcomes.proof_artifacts %}
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <p class="muted">Status: {{ item.status|replace('_', ' ')|title }}</p>
+                </div>
+                {% else %}
+                <div><p class="muted">No proof artifacts captured yet.</p></div>
+                {% endfor %}
+            </div>
+        </article>
+    </div>
+</section>
+{% endif %}
+
+{% if upsc_mode %}
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>UPSC Serious Mode</h2>
+            <p class="muted">Prelims, mains, interview, optional-subject depth, and answer-review history should feel like a real prep system.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        <article class="card soft-card">
+            <p class="eyebrow">Optional subject</p>
+            <h3>{{ upsc_mode.optional_subject }}</h3>
+            <p class="muted">This keeps optional preparation visible instead of hidden inside generic tasks.</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Test dashboard</p>
+            <h3>{{ upsc_mode.completed_tests }}/{{ upsc_mode.completed_tests + upsc_mode.planned_tests }}</h3>
+            <p class="muted">Average test score: {{ upsc_mode.avg_test_score }}</p>
+        </article>
+        <article class="card soft-card">
+            <p class="eyebrow">Current-affairs links</p>
+            <div class="simple-list">
+                {% for item in upsc_mode.current_affairs %}
+                <div><p class="muted">{{ item }}</p></div>
+                {% endfor %}
+            </div>
+        </article>
+    </div>
+    <article class="card soft-card">
+        <h3>Answer-Writing Review History</h3>
+        <div class="simple-list">
+            {% for item in upsc_mode.answer_reviews %}
+            <div>
+                <strong>{{ item.topic }}: {{ item.score }}/5</strong>
+                <p class="muted">{{ item.note }}</p>
+            </div>
+            {% else %}
+            <div><p class="muted">No answer-writing reviews saved yet.</p></div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endif %}
 
 <section class="panel">
     <div class="panel-header panel-header-start">

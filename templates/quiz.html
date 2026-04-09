@@ -13,6 +13,10 @@
         <article class="card soft-card">
             <h3>Customize this test</h3>
             <form method="GET" action="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}" class="inline-form">
+                <select name="mode">
+                    <option value="standard" {% if mode == 'standard' %}selected{% endif %}>Standard quiz</option>
+                    <option value="weekly" {% if mode == 'weekly' %}selected{% endif %}>Weekly assessment</option>
+                </select>
                 <select name="difficulty">
                     <option value="easy" {% if selected_difficulty == 'easy' %}selected{% endif %}>Easy</option>
                     <option value="medium" {% if selected_difficulty == 'medium' %}selected{% endif %}>Medium</option>
@@ -28,8 +32,19 @@
             </form>
         </article>
         <article class="card soft-card">
-            <h3>Recent quiz trend</h3>
-            {% if recent_results %}
+            <h3>{% if mode == 'weekly' %}Weekly assessment focus{% else %}Recent quiz trend{% endif %}</h3>
+            {% if mode == 'weekly' %}
+            <div class="simple-list">
+                {% for item in focus_topics %}
+                <div>
+                    <strong>{{ item }}</strong>
+                    <p class="muted">Included from this roadmap's near-term study context.</p>
+                </div>
+                {% else %}
+                <div><p class="muted">No urgent weekly topics were found, so the quiz fell back to broader roadmap coverage.</p></div>
+                {% endfor %}
+            </div>
+            {% elif recent_results %}
             <div class="simple-list">
                 {% for item in recent_results %}
                 <div>
@@ -50,6 +65,9 @@
             <article class="question-card">
                 <h3>{{ loop.index }}. {{ q.question | safe }}</h3>
                 <input type="hidden" name="a_{{ loop.index0 }}" value="{{ q.answer }}">
+                {% if q.category or q.source %}
+                <p class="muted">Topic: {{ q.category or 'General' }}{% if q.source %} | Source: {{ q.source }}{% endif %}</p>
+                {% endif %}
                 <div class="option-grid">
                     {% for opt in q.options %}
                         <label class="option-pill">
