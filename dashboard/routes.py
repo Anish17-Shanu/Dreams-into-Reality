@@ -1905,6 +1905,95 @@ def _generate_contextual_questions(topic_context, amount, roadmap_type="syllabus
     return question_bank[:amount]
 
 
+def _clean_fact_sentence(text):
+    if not text:
+        return ""
+    sentence = re.sub(r"\s+", " ", text).strip()
+    sentence = sentence.replace("\n", " ")
+    return sentence[:220]
+
+
+def _fetch_wikipedia_topic_facts(topic, limit=2):
+    query = (topic or "").strip()
+    if not query:
+        return []
+    facts = []
+    search_data = _safe_get(
+        "https://en.wikipedia.org/w/api.php",
+        params={
+            "action": "opensearch",
+            "search": query,
+            "limit": limit,
+            "namespace": 0,
+            "format": "json",
+        },
+    )
+    if not search_data or not isinstance(search_data, list) or len(search_data) < 4:
+        return []
+    titles = search_data[1] or []
+    urls = search_data[3] or []
+    for idx, title in enumerate(titles[:limit]):
+        summary = _safe_get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(str(title), safe='')}")
+        extract = ""
+        if isinstance(summary, dict):
+            extract = summary.get("extract") or ""
+        fact = _clean_fact_sentence(extract)
+        if not fact:
+            continue
+        facts.append(
+            {
+                "topic": query,
+                "title": str(title),
+                "fact": fact,
+                "url": urls[idx] if idx < len(urls) else "",
+            }
+        )
+    return facts
+
+
+def _build_web_context_questions(topic_context, amount, roadmap_type="syllabus"):
+    questions = []
+    if not topic_context:
+        return questions
+    gathered_facts = []
+    for item in topic_context[:6]:
+        gathered_facts.extend(_fetch_wikipedia_topic_facts(item.get("topic"), limit=2))
+        if len(gathered_facts) >= max(4, amount):
+            break
+    if not gathered_facts:
+        return questions
+
+    random.shuffle(gathered_facts)
+    fact_pool = [item["fact"] for item in gathered_facts if item.get("fact")]
+    for item in gathered_facts:
+        if len(questions) >= amount:
+            break
+        topic = item["topic"]
+        timeline_hint = next((ctx.get("timeline_hint") for ctx in topic_context if ctx.get("topic") == topic), "This week")
+        correct = item["fact"]
+        wrong_options = [fact for fact in fact_pool if fact != correct]
+        random.shuffle(wrong_options)
+        distractors = wrong_options[:2]
+        if roadmap_type == "upsc":
+            distractors.append("This topic has no link to prelims, mains, or revision strategy.")
+        elif roadmap_type == "career":
+            distractors.append("This topic should be skipped until all tutorials are complete.")
+        else:
+            distractors.append("This topic should only be revised in the final week.")
+        options = [correct] + distractors[:3]
+        random.shuffle(options)
+        questions.append(
+            {
+                "question": f"{topic} ({timeline_hint}): which statement is supported by a free web reference?",
+                "options": options,
+                "answer": correct,
+                "category": topic,
+                "source": "Wikipedia free API",
+            }
+        )
+    return questions[:amount]
+
+
 def _build_assessment_questions(roadmap, tasks, amount=10, difficulty="medium", mode="standard"):
     focus_topic_context = _build_weekly_focus_topics(tasks)
     focus_topics = [item["topic"] for item in focus_topic_context]
@@ -1914,8 +2003,13 @@ def _build_assessment_questions(roadmap, tasks, amount=10, difficulty="medium", 
         roadmap.roadmap_type,
     )
     if mode == "weekly":
+        web_context = _build_web_context_questions(
+            focus_topic_context or [{"topic": "Core review", "timeline_hint": "This week", "is_revision": True}],
+            max(3, amount // 2),
+            roadmap.roadmap_type,
+        )
         external = _fetch_opentdb_questions(amount=max(3, amount // 2), difficulty=difficulty)
-        combined = contextual[: max(amount - len(external), 0)] + external[: amount - min(len(contextual), amount)]
+        combined = contextual[: max(amount // 2, 3)] + web_context + external
         while len(combined) < amount:
             combined.extend(
                 _generate_contextual_questions(
@@ -1926,7 +2020,14 @@ def _build_assessment_questions(roadmap, tasks, amount=10, difficulty="medium", 
             )
         return combined[:amount], focus_topics
     external = _fetch_opentdb_questions(amount=amount, difficulty=difficulty)
-    return (external or contextual)[:amount], focus_topics
+    if external:
+        return external[:amount], focus_topics
+    web_context = _build_web_context_questions(
+        focus_topic_context or [{"topic": "Core review", "timeline_hint": "This week", "is_revision": True}],
+        max(3, amount // 2),
+        roadmap.roadmap_type,
+    )
+    return (contextual + web_context)[:amount], focus_topics
 
 
 def _persist_quiz_questions(roadmap, questions, difficulty, mode):
