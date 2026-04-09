@@ -34,6 +34,39 @@ def _has_table(table_name):
     return table_name in _available_tables()
 
 
+def _table_columns(table_name):
+    if not _has_table(table_name):
+        return set()
+    try:
+        return {column["name"] for column in inspect(db.engine).get_columns(table_name)}
+    except Exception:
+        return set()
+
+
+def _has_columns(table_name, required_columns):
+    columns = _table_columns(table_name)
+    return bool(columns) and set(required_columns).issubset(columns)
+
+
+def _has_mock_test_schedule_schema():
+    return _has_columns(
+        "mock_test_schedule",
+        {
+            "id",
+            "title",
+            "test_type",
+            "scheduled_date",
+            "duration_minutes",
+            "questions_count",
+            "status",
+            "score",
+            "notes",
+            "created_at",
+            "roadmap_id",
+        },
+    )
+
+
 def _normalize_pace_mode(value):
     value = (value or "steady").strip().lower()
     if value in {"burnout_safe", "steady", "sprint"}:
@@ -2512,7 +2545,7 @@ def create_upsc_roadmap():
                             score=0.95,
                             task_id=task.id
                         ))
-                if _has_table("mock_test_schedule"):
+                if _has_mock_test_schedule_schema():
                     for spec in _build_upsc_test_plan(start_date, target_date, upsc_focus):
                         db.session.add(MockTestSchedule(
                             title=spec["title"],
@@ -2563,7 +2596,7 @@ def view_roadmap(roadmap_id):
         )
         annotated_resources_map[task.id] = [_annotate_resource(item) for item in resources_map[task.id]]
     tests = []
-    if _has_table("mock_test_schedule"):
+    if _has_mock_test_schedule_schema():
         tests = MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).order_by(MockTestSchedule.scheduled_date.asc()).all()
     upsc_buckets = _build_upsc_dashboard_data(tasks, tests) if roadmap.roadmap_type == "upsc" else []
     recent_updates = _build_recent_updates(roadmap)
@@ -2712,7 +2745,7 @@ def practice(roadmap_id):
     readiness_metrics = _build_readiness_metrics(
         roadmap,
         Task.query.filter_by(roadmap_id=roadmap.id).all(),
-        MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).all() if _has_table("mock_test_schedule") else [],
+        MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).all() if _has_mock_test_schedule_schema() else [],
         done_map,
         attempts,
         QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all() if _has_table("quiz_result") else []
@@ -2829,6 +2862,9 @@ def schedule_test(roadmap_id):
     roadmap = Roadmap.query.get_or_404(roadmap_id)
     if roadmap.user_id != session['user_id']:
         return redirect(url_for('dashboard.dashboard'))
+    if not _has_mock_test_schedule_schema():
+        flash("Mock test scheduling is temporarily unavailable until the database schema is updated.")
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
     title = request.form.get("title", "Mock Test")
     test_type = request.form.get("test_type", "mock")
     if test_type not in {"diagnostic", "sectional", "full_length", "revision", "essay", "interview", "mock"}:
@@ -2859,6 +2895,9 @@ def schedule_test(roadmap_id):
 @login_required
 def update_test_status(roadmap_id, test_id):
     roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if not _has_mock_test_schedule_schema():
+        flash("Mock test updates are temporarily unavailable until the database schema is updated.")
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
     test = MockTestSchedule.query.get_or_404(test_id)
     if roadmap.user_id != session['user_id'] or test.roadmap_id != roadmap.id:
         return redirect(url_for('dashboard.dashboard'))
@@ -3138,7 +3177,7 @@ def export_monthly_review(roadmap_id):
     if roadmap.user_id != session['user_id']:
         return redirect(url_for('dashboard.dashboard'))
     tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
-    tests = MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).order_by(MockTestSchedule.scheduled_date.asc()).all() if _has_table("mock_test_schedule") else []
+    tests = MockTestSchedule.query.filter_by(roadmap_id=roadmap.id).order_by(MockTestSchedule.scheduled_date.asc()).all() if _has_mock_test_schedule_schema() else []
     review = _build_monthly_review(roadmap, tasks, tests)
     story = _build_progress_story(roadmap, {}, [])
     lines = [

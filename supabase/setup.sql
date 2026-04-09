@@ -126,6 +126,17 @@ create table if not exists mock_test_schedule (
   roadmap_id bigint not null references roadmap(id) on delete cascade
 );
 
+alter table mock_test_schedule add column if not exists title varchar(160);
+alter table mock_test_schedule add column if not exists test_type varchar(30) default 'mock';
+alter table mock_test_schedule add column if not exists scheduled_date date;
+alter table mock_test_schedule add column if not exists duration_minutes integer default 90;
+alter table mock_test_schedule add column if not exists questions_count integer default 50;
+alter table mock_test_schedule add column if not exists status varchar(20) default 'planned';
+alter table mock_test_schedule add column if not exists score double precision;
+alter table mock_test_schedule add column if not exists notes text;
+alter table mock_test_schedule add column if not exists created_at timestamp without time zone default now();
+alter table mock_test_schedule add column if not exists roadmap_id bigint references roadmap(id) on delete cascade;
+
 create index if not exists idx_mock_roadmap on mock_test_schedule(roadmap_id);
 
 create table if not exists quiz_result (
