@@ -81,6 +81,9 @@ class DreamsIntoRealitySmokeTests(unittest.TestCase):
         self.assertIn("Tasks", body)
         self.assertIn("Recovery Options", body)
         self.assertIn("Risk Radar", body)
+        self.assertIn("Plan Quality Control", body)
+        self.assertIn("Focus Session", body)
+        self.assertIn("Monthly review", body)
 
     def test_view_roadmap_degrades_if_optional_tables_are_missing(self):
         self._register_and_login()
@@ -128,6 +131,7 @@ class DreamsIntoRealitySmokeTests(unittest.TestCase):
         self.assertEqual(practice_response.status_code, 200)
         self.assertIn("Weak-Area Radar", practice_body)
         self.assertIn("Practice Coach", practice_body)
+        self.assertIn("Gap signal", practice_body)
 
         quiz_submit = self.client.post(
             f"/roadmap/{roadmap_id}/quiz/submit",
@@ -138,6 +142,32 @@ class DreamsIntoRealitySmokeTests(unittest.TestCase):
         self.assertEqual(quiz_submit.status_code, 200)
         self.assertIn("Quiz Analysis", quiz_body)
         self.assertIn("Best next step", quiz_body)
+
+    def test_demo_and_text_exports_render(self):
+        self._register_and_login()
+        create_response = self.client.post(
+            "/roadmap/new",
+            data={
+                "title": "Career Clarity",
+                "roadmap_type": "career",
+                "timeline_weeks": "6",
+                "hours_per_week": "6",
+                "study_days_per_week": "5",
+                "workflow_mode": "deadline",
+                "target_outcome": "portfolio-ready",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(create_response.status_code, 302)
+        roadmap_id = create_response.headers["Location"].rsplit("/", 1)[-1]
+
+        demo_response = self.client.get("/demo")
+        self.assertEqual(demo_response.status_code, 200)
+        self.assertIn("Demo roadmap", demo_response.get_data(as_text=True))
+
+        monthly_export = self.client.get(f"/roadmap/{roadmap_id}/export/monthly-review.txt")
+        self.assertEqual(monthly_export.status_code, 200)
+        self.assertIn("Monthly Review", monthly_export.get_data(as_text=True))
 
 
 if __name__ == "__main__":

@@ -54,6 +54,18 @@
 </section>
 {% endif %}
 
+{% if dashboard_insights %}
+<section class="grid grid-2 compact-grid">
+    {% for item in dashboard_insights %}
+    <article class="card soft-card">
+        <p class="eyebrow">Insight</p>
+        <h3>{{ item.title }}</h3>
+        <p class="muted">{{ item.detail }}</p>
+    </article>
+    {% endfor %}
+</section>
+{% endif %}
+
 <section class="grid">
     {% if roadmaps %}
         {% for roadmap in roadmaps %}

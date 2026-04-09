@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero hero-wide">
+    <div>
+        <span class="pill">Demo roadmap</span>
+        <h1>{{ demo_plan.title }}</h1>
+        <p class="muted">{{ demo_plan.summary }}</p>
+    </div>
+    <div class="hero-card hero-card-soft">
+        <h3>Today</h3>
+        <p class="muted">{{ demo_plan.today }}</p>
+    </div>
+</section>
+
+<section class="grid grid-2 compact-grid">
+    <article class="card soft-card">
+        <h3>This Week</h3>
+        <div class="simple-list">
+            {% for item in demo_plan.week %}
+            <div><p class="muted">{{ item }}</p></div>
+            {% endfor %}
+        </div>
+    </article>
+    <article class="card soft-card">
+        <h3>Visible Outcomes</h3>
+        <div class="simple-list">
+            {% for item in demo_plan.outcomes %}
+            <div><p class="muted">{{ item }}</p></div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endblock %}

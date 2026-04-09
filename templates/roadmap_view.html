@@ -41,6 +41,28 @@
         </article>
     </div>
 
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Focus Session</h3>
+            <p class="muted">Start a protected work block directly from the roadmap. Keep the task small enough to finish with confidence.</p>
+            <div class="action-links focus-buttons">
+                <button type="button" class="ghost focus-trigger" data-minutes="25">25 min</button>
+                <button type="button" class="ghost focus-trigger" data-minutes="45">45 min</button>
+                <button type="button" class="ghost focus-trigger" data-minutes="90">90 min</button>
+            </div>
+            <div class="focus-timer-card" id="focus-timer-card">
+                <strong id="focus-label">No session running</strong>
+                <p class="muted" id="focus-remaining">Choose a focus block to begin.</p>
+            </div>
+        </article>
+        <article class="card soft-card">
+            <h3>Adaptation Mode</h3>
+            <p class="eyebrow">{{ adaptation_status.headline }}</p>
+            <p class="muted">{{ adaptation_status.detail }}</p>
+            <p class="muted">Days since last check-in: {{ adaptation_status.days_since_checkin if adaptation_status.days_since_checkin is not none else 'No history yet' }}</p>
+        </article>
+    </div>
+
     <div class="grid grid-3 compact-grid">
         <article class="card summary-card">
             <p class="eyebrow">Next task</p>
@@ -137,6 +159,28 @@
                         <input type="text" name="note" placeholder="What did you finish today?">
                     </label>
                 </div>
+                <div class="inline-fields">
+                    <label>
+                        How heavy did this week feel?
+                        <select name="load_feel">
+                            <option value="">Select</option>
+                            <option value="light">Light</option>
+                            <option value="manageable">Manageable</option>
+                            <option value="heavy">Heavy</option>
+                            <option value="overloaded">Overloaded</option>
+                        </select>
+                    </label>
+                    <label>
+                        Confidence check
+                        <select name="confidence">
+                            <option value="">Select</option>
+                            <option value="high">Confident</option>
+                            <option value="growing">Growing</option>
+                            <option value="fragile">Fragile</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </label>
+                </div>
                 <button type="submit">Save update</button>
             </form>
             <form method="POST" action="{{ url_for('dashboard.checkin', roadmap_id=roadmap.id) }}" class="quick-checkin-inline">
@@ -154,6 +198,12 @@
                 {% endif %}
                 <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>
                 <a class="ghost" href="{{ url_for('dashboard.export_ics', roadmap_id=roadmap.id) }}">Export Calendar</a>
+                <a class="ghost" href="{{ url_for('dashboard.export_summary', roadmap_id=roadmap.id) }}">Study plan</a>
+                <a class="ghost" href="{{ url_for('dashboard.export_revision', roadmap_id=roadmap.id) }}">Revision sheet</a>
+                <a class="ghost" href="{{ url_for('dashboard.export_monthly_review', roadmap_id=roadmap.id) }}">Monthly review</a>
+                {% if roadmap.roadmap_type == 'career' %}
+                <a class="ghost" href="{{ url_for('dashboard.export_interview', roadmap_id=roadmap.id) }}">Interview snapshot</a>
+                {% endif %}
             </div>
             <form method="POST" action="{{ url_for('dashboard.rebalance', roadmap_id=roadmap.id) }}" class="inline-form">
                 <input type="number" name="timeline_weeks" min="0" max="52" placeholder="New timeline in weeks">
@@ -162,6 +212,24 @@
             <p class="muted">Resource status: {{ roadmap.resource_fetch_status|capitalize }}</p>
             <p class="muted">Streak: {{ roadmap.streak }} days | Last check-in: {{ last_checkin }}</p>
         </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Plan Quality Control</h2>
+            <p class="muted">This roadmap checks for common failure patterns before they become user frustration.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        {% for item in quality_report %}
+        <article class="card soft-card risk-{{ item.tone }}">
+            <p class="eyebrow">Quality signal</p>
+            <h3>{{ item.title }}</h3>
+            <p class="muted">{{ item.detail }}</p>
+        </article>
+        {% endfor %}
     </div>
 </section>
 
@@ -194,6 +262,24 @@
 <section class="panel">
     <div class="panel-header panel-header-start">
         <div>
+            <h2>Progress Story</h2>
+            <p class="muted">Growth should feel visible, not just numerical.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        {% for item in progress_story %}
+        <article class="card soft-card">
+            <p class="eyebrow">Signal</p>
+            <h3>Momentum update</h3>
+            <p class="muted">{{ item }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
             <h2>Outcome Scorecard</h2>
             <p class="muted">This roadmap should produce visible proof, not just checked boxes.</p>
         </div>
@@ -204,6 +290,24 @@
             <p class="eyebrow">Proof point</p>
             <h3>{{ artifact.title }}</h3>
             <p class="muted">{{ artifact.detail }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Milestone Timeline</h2>
+            <p class="muted">Track the visible timeline of completion instead of treating the roadmap like a flat to-do list.</p>
+        </div>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        {% for milestone in milestone_timeline %}
+        <article class="card soft-card {% if milestone.done %}milestone-done{% endif %}">
+            <p class="eyebrow">{% if milestone.done %}Completed{% else %}Upcoming{% endif %}</p>
+            <h3>{{ milestone.title }}</h3>
+            <p class="muted">{{ milestone.when or 'Flexible date' }}</p>
         </article>
         {% endfor %}
     </div>
@@ -366,9 +470,33 @@
             <p class="muted">Update one task at a time. You do not need to fill every field.</p>
         </div>
     </div>
+    <div class="inline-fields roadmap-filters">
+        <label>
+            Search tasks
+            <input type="text" id="task-search" placeholder="Search by topic, proof task, or revision block">
+        </label>
+        <label>
+            Status filter
+            <select id="task-status-filter">
+                <option value="all">All statuses</option>
+                <option value="todo">To do</option>
+                <option value="doing">In progress</option>
+                <option value="done">Done</option>
+            </select>
+        </label>
+        <label>
+            Difficulty filter
+            <select id="task-difficulty-filter">
+                <option value="all">All difficulty</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+        </label>
+    </div>
     <div class="task-list">
         {% for task in tasks %}
-        <article class="task-card" id="task-{{ task.id }}">
+        <article class="task-card roadmap-task-card" id="task-{{ task.id }}" data-status="{{ task.status }}" data-difficulty="{{ task.difficulty }}" data-title="{{ task.title|lower }}">
             <div class="task-meta">
                 <span class="task-index">Step {{ task.order_index }}</span>
                 <div>
@@ -391,6 +519,12 @@
                 <select name="completion_type">
                     <option value="planned" {% if task.completion_type == 'planned' %}selected{% endif %}>Done as planned</option>
                     <option value="alternative" {% if task.completion_type == 'alternative' %}selected{% endif %}>Done in another way</option>
+                    <option value="revised" {% if task.completion_type == 'revised' %}selected{% endif %}>Revised well</option>
+                    <option value="practiced" {% if task.completion_type == 'practiced' %}selected{% endif %}>Practiced</option>
+                    <option value="solved" {% if task.completion_type == 'solved' %}selected{% endif %}>Solved</option>
+                    <option value="wrote_answers" {% if task.completion_type == 'wrote_answers' %}selected{% endif %}>Wrote answers</option>
+                    <option value="built_project" {% if task.completion_type == 'built_project' %}selected{% endif %}>Built project</option>
+                    <option value="reviewed_mistakes" {% if task.completion_type == 'reviewed_mistakes' %}selected{% endif %}>Reviewed mistakes</option>
                 </select>
                 <input type="number" step="0.5" name="actual_hours" placeholder="Hours spent">
                 <input type="text" name="notes" placeholder="Short note">
@@ -460,4 +594,57 @@
         {% endfor %}
     </div>
 </section>
+<script>
+    const focusTriggers = document.querySelectorAll(".focus-trigger");
+    const focusLabel = document.getElementById("focus-label");
+    const focusRemaining = document.getElementById("focus-remaining");
+    let focusInterval = null;
+
+    focusTriggers.forEach((button) => {
+        button.addEventListener("click", () => {
+            const minutes = parseInt(button.dataset.minutes || "25", 10);
+            let remaining = minutes * 60;
+            if (focusInterval) {
+                clearInterval(focusInterval);
+            }
+            focusLabel.textContent = `Focus session running: ${minutes} minutes`;
+            const render = () => {
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                focusRemaining.textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")} remaining`;
+            };
+            render();
+            focusInterval = setInterval(() => {
+                remaining -= 1;
+                render();
+                if (remaining <= 0) {
+                    clearInterval(focusInterval);
+                    focusLabel.textContent = "Focus block complete";
+                    focusRemaining.textContent = "Log a quick check-in or mark the task progress while the work is fresh.";
+                }
+            }, 1000);
+        });
+    });
+
+    const searchInput = document.getElementById("task-search");
+    const statusFilter = document.getElementById("task-status-filter");
+    const difficultyFilter = document.getElementById("task-difficulty-filter");
+    const taskCards = document.querySelectorAll(".roadmap-task-card");
+
+    function filterTasks() {
+        const term = (searchInput?.value || "").trim().toLowerCase();
+        const status = statusFilter?.value || "all";
+        const difficulty = difficultyFilter?.value || "all";
+        taskCards.forEach((card) => {
+            const matchesTerm = !term || (card.dataset.title || "").includes(term);
+            const matchesStatus = status === "all" || card.dataset.status === status;
+            const matchesDifficulty = difficulty === "all" || card.dataset.difficulty === difficulty;
+            card.style.display = matchesTerm && matchesStatus && matchesDifficulty ? "" : "none";
+        });
+    }
+
+    searchInput?.addEventListener("input", filterTasks);
+    statusFilter?.addEventListener("change", filterTasks);
+    difficultyFilter?.addEventListener("change", filterTasks);
+</script>
 {% endblock %}

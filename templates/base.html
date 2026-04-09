@@ -24,8 +24,10 @@
                 <a href="{{ url_for('dashboard.dashboard') }}">My Plans</a>
                 <a href="{{ url_for('dashboard.create_roadmap') }}">Create Plan</a>
                 <a href="{{ url_for('dashboard.create_upsc_roadmap') }}">UPSC Mission</a>
+                <a href="{{ url_for('dashboard.demo') }}">Demo</a>
                 <a href="{{ url_for('auth.logout') }}" class="nav-cta">Log out</a>
             {% else %}
+                <a href="{{ url_for('dashboard.demo') }}">Demo</a>
                 <a href="{{ url_for('auth.login') }}">Login</a>
                 <a href="{{ url_for('auth.register') }}" class="nav-cta">Get Started</a>
             {% endif %}

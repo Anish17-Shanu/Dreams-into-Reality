@@ -69,7 +69,7 @@
                 {% for area in weak_areas %}
                 <div class="risk-card risk-{{ area.tone }}">
                     <strong>{{ area.topic }}: {{ area.avg_score }}/5</strong>
-                    <p class="muted">{{ area.attempts }} attempt(s). {{ area.action }}</p>
+                    <p class="muted">{{ area.attempts }} attempt(s), {{ area.repeated_misses }} repeated miss(es), {{ area.quiz_vs_writing }}. {{ area.action }}</p>
                 </div>
                 {% endfor %}
             </div>
@@ -87,6 +87,10 @@
                 <div>
                     <strong>System advice</strong>
                     <p class="muted">{{ practice_coach.recommendation }}</p>
+                </div>
+                <div>
+                    <strong>Gap signal</strong>
+                    <p class="muted">{{ practice_coach.gap_signal }}</p>
                 </div>
                 <div>
                     <strong>Best next move</strong>

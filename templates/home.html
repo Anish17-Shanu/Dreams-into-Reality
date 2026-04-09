@@ -66,4 +66,25 @@
         <p class="muted">If momentum slips, the roadmap can rebalance and explain the tradeoff clearly.</p>
     </article>
 </section>
+
+{% if demo_cards %}
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <h2>Sample Roadmaps</h2>
+            <p class="muted">See the kind of outcome-driven plans this product is built to create.</p>
+        </div>
+        <a class="ghost" href="{{ url_for('dashboard.demo') }}">Open full demo</a>
+    </div>
+    <div class="grid grid-3 compact-grid">
+        {% for item in demo_cards %}
+        <article class="card soft-card">
+            <p class="eyebrow">Sample</p>
+            <h3>{{ item.title }}</h3>
+            <p class="muted">{{ item.detail }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 {% endblock %}

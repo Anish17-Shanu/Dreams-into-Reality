@@ -58,6 +58,50 @@
                 </select>
             </label>
         </div>
+        <div class="inline-fields">
+            <label>
+                Current level
+                <select name="current_level">
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                </select>
+            </label>
+            <label>
+                Deadline pressure
+                <select name="deadline_pressure">
+                    <option value="low">Low</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="high">High</option>
+                </select>
+            </label>
+            <label>
+                Confidence right now
+                <select name="confidence_level">
+                    <option value="fragile">Fragile</option>
+                    <option value="growing">Growing</option>
+                    <option value="high">High</option>
+                </select>
+            </label>
+        </div>
+        <div class="inline-fields">
+            <label>
+                Workflow mode
+                <select name="workflow_mode">
+                    <option value="normal">Normal</option>
+                    <option value="deadline">Deadline mode</option>
+                    <option value="exam">Exam mode</option>
+                </select>
+            </label>
+            <label>
+                Weak areas
+                <input type="text" name="weak_areas" placeholder="e.g. revision, SQL joins, CSAT comprehension">
+            </label>
+            <label>
+                Target outcome
+                <input type="text" name="target_outcome" placeholder="e.g. portfolio-ready, exam confidence, strong revision sheet">
+            </label>
+        </div>
         <label>
             Start date
             <input type="date" name="start_date">

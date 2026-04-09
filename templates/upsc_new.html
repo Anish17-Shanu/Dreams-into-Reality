@@ -80,6 +80,50 @@
                 </select>
             </label>
         </div>
+        <div class="inline-fields">
+            <label>
+                Current level
+                <select name="current_level">
+                    <option value="aspirant">Aspirant</option>
+                    <option value="first serious attempt">First serious attempt</option>
+                    <option value="experienced">Experienced</option>
+                </select>
+            </label>
+            <label>
+                Deadline pressure
+                <select name="deadline_pressure">
+                    <option value="high">High</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="low">Low</option>
+                </select>
+            </label>
+            <label>
+                Confidence right now
+                <select name="confidence_level">
+                    <option value="fragile">Fragile</option>
+                    <option value="growing">Growing</option>
+                    <option value="high">High</option>
+                </select>
+            </label>
+        </div>
+        <div class="inline-fields">
+            <label>
+                Workflow mode
+                <select name="workflow_mode">
+                    <option value="exam">Exam mode</option>
+                    <option value="deadline">Deadline mode</option>
+                    <option value="normal">Normal</option>
+                </select>
+            </label>
+            <label>
+                Weak areas
+                <input type="text" name="weak_areas" placeholder="e.g. answer writing, CSAT, environment, essay">
+            </label>
+            <label>
+                Target outcome
+                <input type="text" name="target_outcome" placeholder="e.g. clear prelims confidently, stronger mains structure">
+            </label>
+        </div>
         <label>
             Optional subject
             <input type="text" name="upsc_optional_subject" placeholder="e.g. Sociology, Anthropology, PSIR">
