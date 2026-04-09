@@ -1760,57 +1760,143 @@ def _build_weekly_focus_topics(tasks):
         if task.due_date and task.due_date > week_end:
             continue
         topic = _base_task_topic(task.title)
-        if topic and topic not in topics:
-            topics.append(topic)
-    return topics[:6]
-
-
-def _generate_contextual_questions(topics, amount, roadmap_type="syllabus"):
-    question_bank = []
-    for topic in topics[:amount]:
-        if roadmap_type == "career":
-            correct = "Build or explain a concrete proof artifact"
-            options = [
-                correct,
-                "Keep collecting more random tutorials",
-                "Skip practice until the full roadmap ends",
-                "Avoid measurable outputs for now",
-            ]
-        elif roadmap_type == "upsc":
-            correct = "Revise the issue, attempt a short answer, and review the weak spot"
-            options = [
-                correct,
-                "Keep reading without testing retention",
-                "Ignore PYQs for the topic",
-                "Add three new sources before revision",
-            ]
-        else:
-            correct = "Review the concept, solve one application, and note the mistake pattern"
-            options = [
-                correct,
-                "Only reread the title and move on",
-                "Skip revision because the topic is already scheduled",
-                "Wait until the final week to revisit it",
-            ]
-        random.shuffle(options)
-        question_bank.append({
-            "question": f"What is the strongest next move to assess progress on {topic}?",
-            "options": options,
-            "answer": correct,
-            "category": topic,
-            "source": "Roadmap context",
+        if not topic:
+            continue
+        if any(item["topic"] == topic for item in topics):
+            continue
+        timeline_hint = "Due this week" if task.due_date else "Flexible this week"
+        if task.due_date and task.due_date < today:
+            timeline_hint = "Overdue priority"
+        topics.append({
+            "topic": topic,
+            "due_date": task.due_date,
+            "difficulty": task.difficulty or "medium",
+            "timeline_hint": timeline_hint,
+            "is_revision": "revision" in _normalize(task.title),
         })
+    return topics[:8]
+
+
+def _question_variants(topic, roadmap_type, timeline_hint, is_revision):
+    base_topic = topic
+    if roadmap_type == "career":
+        return [
+            {
+                "question": f"For {base_topic}, which action best proves employable progress this week?",
+                "answer": "Ship one concrete artifact and explain outcomes",
+                "options": [
+                    "Ship one concrete artifact and explain outcomes",
+                    "Keep consuming tutorials without output",
+                    "Delay all proof until end of roadmap",
+                    "Only rename tasks as done without evidence",
+                ],
+            },
+            {
+                "question": f"{base_topic} is in focus ({timeline_hint}). What is the best interview-readiness move?",
+                "answer": "Create one STAR-style explanation from this topic's work",
+                "options": [
+                    "Create one STAR-style explanation from this topic's work",
+                    "Avoid reflecting on what you built",
+                    "Skip measurable resume bullet drafting",
+                    "Add new tools before completing current topic",
+                ],
+            },
+        ]
+    if roadmap_type == "upsc":
+        return [
+            {
+                "question": f"Weekly UPSC assessment for {base_topic}: what is the highest-yield next step?",
+                "answer": "Attempt a timed answer, review mistakes, and revise weak dimensions",
+                "options": [
+                    "Attempt a timed answer, review mistakes, and revise weak dimensions",
+                    "Only read notes and skip answer writing",
+                    "Ignore PYQs for this topic this week",
+                    "Collect extra sources without testing retention",
+                ],
+            },
+            {
+                "question": f"For {base_topic} ({timeline_hint}), which choice best supports prelims+mains balance?",
+                "answer": "Do one objective drill plus one short structured written response",
+                "options": [
+                    "Do one objective drill plus one short structured written response",
+                    "Practice only one format forever",
+                    "Avoid revision because the schedule already includes it",
+                    "Skip performance review after test attempts",
+                ],
+            },
+        ]
+    revision_phrase = "revise-before-forgetting" if is_revision else "progress-check"
+    return [
+        {
+            "question": f"{base_topic} is marked for {revision_phrase} ({timeline_hint}). Which move best improves retention?",
+            "answer": "Solve one application and record one mistake pattern",
+            "options": [
+                "Solve one application and record one mistake pattern",
+                "Re-read headings without retrieval practice",
+                "Postpone all revision to final week",
+                "Mark complete without checking understanding",
+            ],
+        },
+        {
+            "question": f"For {base_topic}, what is the best weekly self-assessment method?",
+            "answer": "Use a short quiz plus one written explanation in your own words",
+            "options": [
+                "Use a short quiz plus one written explanation in your own words",
+                "Only watch another long video",
+                "Skip checks because timeline already exists",
+                "Move to next topic without feedback loop",
+            ],
+        },
+    ]
+
+
+def _generate_contextual_questions(topic_context, amount, roadmap_type="syllabus"):
+    question_bank = []
+    if not topic_context:
+        topic_context = [{"topic": "Core review", "timeline_hint": "This week", "is_revision": False}]
+
+    for item in topic_context:
+        topic = item["topic"]
+        variants = _question_variants(
+            topic,
+            roadmap_type,
+            item.get("timeline_hint", "This week"),
+            bool(item.get("is_revision")),
+        )
+        for variant in variants:
+            options = variant["options"][:]
+            random.shuffle(options)
+            question_bank.append({
+                "question": variant["question"],
+                "options": options,
+                "answer": variant["answer"],
+                "category": topic,
+                "source": "Roadmap weekly context",
+            })
+            if len(question_bank) >= amount:
+                return question_bank[:amount]
     return question_bank[:amount]
 
 
 def _build_assessment_questions(roadmap, tasks, amount=10, difficulty="medium", mode="standard"):
-    focus_topics = _build_weekly_focus_topics(tasks)
-    contextual = _generate_contextual_questions(focus_topics or [_base_task_topic(task.title) for task in tasks[:5]], amount, roadmap.roadmap_type)
+    focus_topic_context = _build_weekly_focus_topics(tasks)
+    focus_topics = [item["topic"] for item in focus_topic_context]
+    contextual = _generate_contextual_questions(
+        focus_topic_context or [{"topic": _base_task_topic(task.title), "timeline_hint": "This week", "is_revision": False} for task in tasks[:5] if _base_task_topic(task.title)],
+        amount,
+        roadmap.roadmap_type,
+    )
     if mode == "weekly":
         external = _fetch_opentdb_questions(amount=max(3, amount // 2), difficulty=difficulty)
         combined = contextual[: max(amount - len(external), 0)] + external[: amount - min(len(contextual), amount)]
         while len(combined) < amount:
-            combined.extend(_generate_contextual_questions(focus_topics or ["Core review"], amount - len(combined), roadmap.roadmap_type))
+            combined.extend(
+                _generate_contextual_questions(
+                    focus_topic_context or [{"topic": "Core review", "timeline_hint": "This week", "is_revision": True}],
+                    amount - len(combined),
+                    roadmap.roadmap_type,
+                )
+            )
         return combined[:amount], focus_topics
     external = _fetch_opentdb_questions(amount=amount, difficulty=difficulty)
     return (external or contextual)[:amount], focus_topics
