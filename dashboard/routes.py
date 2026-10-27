@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, session, url_for, current_app, flash, send_file
+from flask import Blueprint, render_template, request, redirect, session, url_for, current_app, flash, send_file, jsonify
 from extensions import db
 from models.models import User, Roadmap, Task, Resource, ResourceFeedback, Checkin, Question, QuestionAttempt, PyqCompletion, MockTestSchedule, QuizResult, QuizQuestion, QuizQuestionAttempt
+from dashboard.nl_plan import parse_plan_text
 from datetime import datetime, timedelta, date, UTC
 from werkzeug.utils import secure_filename
 from urllib.parse import quote
@@ -15,6 +16,18 @@ import requests
 import threading
 from supabase import create_client
 from sqlalchemy import inspect
+from security import rate_limit
+from pyq import (
+    OFFICIAL_ANSWER_KEY_URL,
+    OFFICIAL_PYQ_URL,
+    PYQ_ATTRIBUTION,
+    coverage_stats,
+    ensure_pyq_synced,
+    get_interview_set,
+    mains_questions,
+    prelims_questions,
+    subject_keywords_for_topics,
+)
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -30,6 +43,15 @@ def _available_tables():
         return set(inspect(db.engine).get_table_names())
     except Exception:
         return set()
+
+
+def _is_admin():
+    user_id = session.get('user_id')
+    allowed = current_app.config.get('ADMIN_EMAILS') or []
+    if not user_id or not allowed:
+        return False
+    user = User.query.get(user_id)
+    return bool(user and user.email and user.email.lower() in allowed)
 
 
 def _has_table(table_name):
@@ -118,59 +140,552 @@ def _utc_now():
 def _utc_today():
     return _utc_now().date()
 
-CAREER_TEMPLATES = {
-    "frontend developer": {
+CAREER_FAMILIES = {
+    "software": {
+        "label": "Software development",
         "topics": [
-            "HTML fundamentals", "CSS layout and responsive design", "JavaScript fundamentals",
-            "TypeScript basics", "React core concepts", "State management", "API integration",
-            "Testing and debugging", "Accessibility", "Performance optimization", "Deployment"
+            "Programming fundamentals and problem solving",
+            "Version control with Git and GitHub",
+            "Data structures and algorithms essentials",
+            "Web fundamentals: HTML, CSS, and JavaScript",
+            "APIs and backend request handling",
+            "Databases and data modeling",
+            "Testing, debugging, and code review",
+            "Deployment and CI/CD basics",
+            "System design and architecture basics",
+            "Security and performance essentials",
+            "Collaboration workflow for real teams",
+            "Portfolio and open-source contribution",
         ],
         "projects": [
-            "Portfolio website", "Responsive landing page", "React dashboard", "API-driven app",
-            "Accessible UI redesign"
+            "{role} portfolio website",
+            "Full-stack app with authentication and a database",
+            "REST API with tests and documentation",
+            "Capstone: deploy a real product end to end",
         ],
+        "assignments": [
+            "Solve 30 coding katas across easy and medium levels",
+            "Build 3 reusable UI components and document them",
+            "Write automated tests for one existing project",
+            "Refactor a small codebase and record what improved",
+            "Publish one project with setup instructions and a demo",
+        ],
+        "tools": ["Git and GitHub", "VS Code", "Postman", "Docker"],
+        "outcome": "A deployable portfolio, tested projects, and interview-ready code explanations.",
     },
-    "data analyst": {
+    "data": {
+        "label": "Data and AI",
         "topics": [
-            "Spreadsheet mastery", "SQL fundamentals", "Data cleaning", "Exploratory data analysis",
-            "Visualization principles", "Statistics basics", "Python for analytics", "Dashboards",
-            "Storytelling with data", "Business metrics"
+            "Spreadsheet fluency and data hygiene",
+            "SQL queries, joins, and window functions",
+            "Python or R for data work",
+            "Probability and statistics essentials",
+            "Data cleaning and validation",
+            "Exploratory data analysis",
+            "Visualization and chart selection",
+            "Dashboards and reporting",
+            "Experimentation and A/B testing",
+            "Business metrics and decision framing",
+            "Storytelling with data",
+            "Data ethics, privacy, and model evaluation",
         ],
         "projects": [
-            "KPI dashboard", "Customer churn analysis", "Sales forecasting report"
+            "{role} analytics dashboard",
+            "Customer churn or retention analysis",
+            "Forecasting report with clear assumptions",
+            "Capstone: end-to-end data pipeline and insight deck",
         ],
+        "assignments": [
+            "Write 20 SQL queries against a public dataset",
+            "Clean a messy dataset and document every decision",
+            "Build 3 charts that answer one business question",
+            "Complete one statistics or Kaggle case study",
+            "Present a 5-slide insight deck with recommendations",
+        ],
+        "tools": ["SQL", "Python (pandas)", "Excel or Google Sheets", "Power BI or Tableau"],
+        "outcome": "A dashboard portfolio, SQL fluency, and business-ready insight stories.",
     },
-    "data scientist": {
+    "design": {
+        "label": "Design and UX",
         "topics": [
-            "Python fundamentals", "Linear algebra and calculus basics", "Probability and statistics",
-            "Feature engineering", "Supervised learning", "Unsupervised learning", "Model evaluation",
-            "Deep learning basics", "MLOps foundations", "Ethics in AI"
+            "Design principles and visual hierarchy",
+            "Typography and color systems",
+            "Layout, spacing, and responsive grids",
+            "User research and interview basics",
+            "Information architecture and user flows",
+            "Wireframing and low-fidelity prototyping",
+            "High-fidelity prototyping and interaction design",
+            "Design systems and component libraries",
+            "Accessibility and inclusive design",
+            "Usability testing and feedback synthesis",
+            "Portfolio storytelling and case studies",
+            "Client communication and design critique",
         ],
         "projects": [
-            "Predictive model", "Clustering analysis", "NLP mini project"
+            "{role} portfolio with 3 case studies",
+            "End-to-end mobile app redesign",
+            "Design system with reusable components",
+            "Capstone: research-led product concept and prototype",
         ],
+        "assignments": [
+            "Recreate 3 strong interfaces and annotate the decisions",
+            "Run 3 short user interviews and summarize insights",
+            "Prototype one flow in Figma with interactive states",
+            "Audit a real product for accessibility issues",
+            "Write one case study with problem, process, and outcome",
+        ],
+        "tools": ["Figma", "FigJam", "Notion", "Maze or a usability test script"],
+        "outcome": "A case-study portfolio, usable prototypes, and a repeatable design process.",
     },
-    "cybersecurity": {
+    "product": {
+        "label": "Product and project management",
         "topics": [
-            "Networking fundamentals", "Linux basics", "Threat modeling", "Web security",
-            "Vulnerability assessment", "Incident response", "SIEM basics", "Cloud security",
-            "Security automation", "Compliance and governance"
+            "Customer discovery and problem framing",
+            "Product requirements and user stories",
+            "Roadmapping and prioritization",
+            "Metrics, funnels, and success criteria",
+            "Stakeholder communication",
+            "Agile delivery and sprint planning",
+            "Risk, scope, and dependency management",
+            "Research synthesis and decision logs",
+            "Launch planning and go-to-market basics",
+            "Post-launch measurement and iteration",
+            "Cross-functional collaboration",
+            "Portfolio of product decisions",
         ],
         "projects": [
-            "Home lab security audit", "Threat model for a web app", "Incident response playbook"
+            "{role} product case study",
+            "Feature proposal with metrics and rollout plan",
+            "Delivery plan for a real team project",
+            "Capstone: product strategy pack for a real problem",
         ],
+        "assignments": [
+            "Interview 5 users and write a discovery summary",
+            "Write a PRD for one feature with clear acceptance criteria",
+            "Build a simple metrics dashboard or tracker",
+            "Run a mock sprint planning and retro",
+            "Publish a case study with trade-offs and results",
+        ],
+        "tools": ["Notion", "Jira or Linear", "Miro", "Google Analytics basics"],
+        "outcome": "A decision portfolio, delivery artifacts, and confident stakeholder storytelling.",
     },
-    "ai engineer": {
+    "marketing": {
+        "label": "Marketing and content",
         "topics": [
-            "Python foundations", "Data pipelines", "ML fundamentals", "Model deployment",
-            "LLM basics", "Prompting patterns", "Evaluation & monitoring", "Vector search",
-            "API integration", "Ethics and safety"
+            "Audience research and positioning",
+            "Copywriting and messaging",
+            "SEO and search intent",
+            "Content planning and editorial calendars",
+            "Social media and community strategy",
+            "Email marketing and lifecycle campaigns",
+            "Paid campaign fundamentals",
+            "Analytics and attribution basics",
+            "Brand voice and storytelling",
+            "Conversion and landing-page optimization",
+            "Public relations and outreach",
+            "Campaign retrospectives",
         ],
         "projects": [
-            "RAG demo app", "Model monitoring dashboard", "LLM-powered workflow automation"
+            "{role} content portfolio",
+            "Full campaign plan for a real product",
+            "SEO content cluster with 5 pieces",
+            "Capstone: launch campaign with measured results",
         ],
+        "assignments": [
+            "Write 5 headlines and 3 landing-page variants",
+            "Audit a website for SEO and messaging gaps",
+            "Build a 2-week content calendar",
+            "Design and send one mock email sequence",
+            "Report campaign results with next-step recommendations",
+        ],
+        "tools": ["Google Analytics", "Google Search Console", "Canva", "Mailchimp"],
+        "outcome": "A measurable campaign portfolio, strong writing samples, and growth evidence.",
+    },
+    "business": {
+        "label": "Business and finance",
+        "topics": [
+            "Accounting and financial statement basics",
+            "Budgeting and forecasting",
+            "Excel modeling and analysis",
+            "Market and competitor research",
+            "Pricing and unit economics",
+            "Risk and compliance basics",
+            "Business writing and reporting",
+            "Negotiation and client communication",
+            "Operations and process improvement",
+            "Data-informed decision making",
+            "Case-study problem solving",
+            "Professional ethics and judgment",
+        ],
+        "projects": [
+            "{role} financial or business analysis",
+            "Market entry or growth case study",
+            "Budget model with scenarios",
+            "Capstone: business plan with clear assumptions",
+        ],
+        "assignments": [
+            "Build a 3-statement financial model",
+            "Analyze one company and write an investment-style memo",
+            "Create a budget with base, best, and worst cases",
+            "Complete 3 business case studies under time pressure",
+            "Present recommendations to a mock stakeholder",
+        ],
+        "tools": ["Excel or Google Sheets", "PowerPoint or Slides", "Power BI", "Accounting software basics"],
+        "outcome": "A modeling portfolio, defensible recommendations, and client-ready communication.",
+    },
+    "healthcare": {
+        "label": "Healthcare",
+        "topics": [
+            "Core anatomy, physiology, and terminology",
+            "Patient communication and empathy",
+            "Clinical workflows and documentation",
+            "Infection control and patient safety",
+            "Ethics, consent, and confidentiality",
+            "Evidence-based practice and research reading",
+            "Emergency response and escalation basics",
+            "Medication or treatment safety basics",
+            "Interprofessional collaboration",
+            "Licensing and exam requirements",
+            "Case-based clinical reasoning",
+            "Professional wellbeing and resilience",
+        ],
+        "projects": [
+            "{role} clinical case portfolio",
+            "Patient-education resource on one condition",
+            "Safety or quality improvement proposal",
+            "Capstone: observed practice reflection and plan",
+        ],
+        "assignments": [
+            "Complete 20 terminology and anatomy recall drills",
+            "Write 3 patient-friendly explanations",
+            "Shadow or interview a working professional",
+            "Practice 5 clinical or licensing exam scenarios",
+            "Document one case using a structured format",
+        ],
+        "tools": ["Medical reference apps", "Anatomy flashcards", "Clinical guidelines", "Licensing exam question banks"],
+        "outcome": "Exam-ready knowledge, safe practice habits, and a reflective clinical portfolio.",
+    },
+    "education": {
+        "label": "Education and training",
+        "topics": [
+            "Learning science and memory principles",
+            "Curriculum and syllabus design",
+            "Lesson planning and objectives",
+            "Assessment and feedback design",
+            "Classroom management and engagement",
+            "Explaining complex ideas simply",
+            "Accessibility and inclusive teaching",
+            "Educational technology tools",
+            "Parent and stakeholder communication",
+            "Reflective teaching practice",
+            "Subject-matter depth",
+            "Teaching portfolio and demo lesson",
+        ],
+        "projects": [
+            "{role} teaching portfolio",
+            "Full unit plan with assessments",
+            "Recorded demo lesson with reflection",
+            "Capstone: learner-centered course or workshop",
+        ],
+        "assignments": [
+            "Design 3 lesson plans with clear outcomes",
+            "Create a formative assessment and rubric",
+            "Record a 10-minute demo lesson",
+            "Run a short learner feedback survey",
+            "Build a 5-session mini course outline",
+        ],
+        "tools": ["Google Classroom", "Canva", "Kahoot or Quizizz", "Notion"],
+        "outcome": "A teaching portfolio, confident demo lessons, and evidence of learner progress.",
+    },
+    "legal": {
+        "label": "Legal",
+        "topics": [
+            "Legal reasoning and issue spotting",
+            "Core constitutional and statutory concepts",
+            "Legal research and citation",
+            "Case reading and ratio extraction",
+            "Legal writing and drafting",
+            "Civil and criminal procedure basics",
+            "Contract and negotiation fundamentals",
+            "Client interviewing and ethics",
+            "Moot court and oral advocacy",
+            "Current legal developments",
+            "Compliance and risk awareness",
+            "Professional judgment under pressure",
+        ],
+        "projects": [
+            "{role} legal research memo",
+            "Draft contract or petition portfolio",
+            "Moot court argument and written submission",
+            "Capstone: case analysis with reasoned opinion",
+        ],
+        "assignments": [
+            "Brief 10 leading cases in a structured format",
+            "Draft one contract clause set with explanations",
+            "Complete 3 timed issue-spotting exercises",
+            "Prepare and deliver a 5-minute moot argument",
+            "Summarize one recent judgment and its impact",
+        ],
+        "tools": ["Legal research databases", "Citation guides", "Case-brief templates", "Moot court recordings"],
+        "outcome": "A writing portfolio, research fluency, and confident oral advocacy practice.",
+    },
+    "engineering": {
+        "label": "Engineering",
+        "topics": [
+            "Mathematics and physics foundations",
+            "Engineering drawing and CAD",
+            "Materials and mechanics basics",
+            "Core systems and components",
+            "Measurement and instrumentation",
+            "Standards, codes, and safety",
+            "Simulation and analysis tools",
+            "Design reviews and documentation",
+            "Manufacturing or construction processes",
+            "Project planning and cost awareness",
+            "Quality and reliability",
+            "Professional engineering practice",
+        ],
+        "projects": [
+            "{role} design project",
+            "CAD model and tolerance study",
+            "Analysis report with calculations",
+            "Capstone: build or simulate a working system",
+        ],
+        "assignments": [
+            "Complete 20 core calculation drills",
+            "Produce one full engineering drawing set",
+            "Run a simulation and explain the results",
+            "Write a design review document",
+            "Conduct a safety and failure-mode review",
+        ],
+        "tools": ["AutoCAD or SolidWorks", "MATLAB or Python", "Excel", "Simulation software"],
+        "outcome": "A design portfolio, defensible calculations, and standards-aware documentation.",
+    },
+    "public_service": {
+        "label": "Public service",
+        "topics": [
+            "Policy and governance fundamentals",
+            "Constitution, law, and institutions",
+            "Economics and public finance",
+            "Current affairs and issue mapping",
+            "Essay and answer writing",
+            "Ethics and integrity in public life",
+            "Data interpretation and reasoning",
+            "Public administration concepts",
+            "Interview and personality test readiness",
+            "Mock tests and previous-year questions",
+            "Optional or specialist subject depth",
+            "Revision and note-making systems",
+        ],
+        "projects": [
+            "{role} preparation system",
+            "Policy brief on a current issue",
+            "Full-length mock test sprint",
+            "Capstone: interview-ready profile and notes",
+        ],
+        "assignments": [
+            "Write 10 structured answers under timed conditions",
+            "Summarize 5 weeks of current affairs",
+            "Complete 2 full-length mock tests",
+            "Prepare one policy brief with recommendations",
+            "Record and review a mock interview",
+        ],
+        "tools": ["Official syllabus and PYQs", "Newspaper or PIB", "Mock test series", "Revision notebooks"],
+        "outcome": "Exam-ready notes, timed writing stamina, and confident interview communication.",
+    },
+    "operations": {
+        "label": "Operations and supply chain",
+        "topics": [
+            "Process mapping and improvement",
+            "Supply chain and inventory basics",
+            "Quality management and metrics",
+            "Vendor and stakeholder management",
+            "Project coordination and scheduling",
+            "Cost control and efficiency",
+            "Health, safety, and compliance",
+            "Logistics and distribution",
+            "Data tracking and reporting",
+            "ERP and spreadsheet tools",
+            "Risk and continuity planning",
+            "Team communication and escalation",
+        ],
+        "projects": [
+            "{role} process improvement case",
+            "Inventory or scheduling model",
+            "Vendor evaluation and scorecard",
+            "Capstone: operations plan for a real workflow",
+        ],
+        "assignments": [
+            "Map one real process end to end",
+            "Build a simple demand or inventory sheet",
+            "Create a vendor scorecard with criteria",
+            "Run a root-cause analysis on a failure case",
+            "Draft a 30-day operational improvement plan",
+        ],
+        "tools": ["Excel or Google Sheets", "ERP basics", "Process maps", "Project trackers"],
+        "outcome": "A process improvement portfolio, measurable efficiency thinking, and coordination confidence.",
+    },
+    "science": {
+        "label": "Science and research",
+        "topics": [
+            "Literature review and source evaluation",
+            "Research methods and study design",
+            "Statistics for research",
+            "Lab or field techniques",
+            "Data recording and reproducibility",
+            "Scientific writing and structure",
+            "Research ethics and safety",
+            "Presentation and poster design",
+            "Grant or proposal writing",
+            "Critical analysis of evidence",
+            "Collaboration and peer review",
+            "Career pathways in research",
+        ],
+        "projects": [
+            "{role} research proposal",
+            "Literature review and evidence map",
+            "Small experiment or field study report",
+            "Capstone: conference-style poster and abstract",
+        ],
+        "assignments": [
+            "Read and summarize 10 key papers",
+            "Write one literature review section",
+            "Design a study with sampling and limitations",
+            "Analyze a public dataset and report findings",
+            "Present a 5-minute research pitch",
+        ],
+        "tools": ["Reference manager", "Python or R", "Lab notebook", "Presentation software"],
+        "outcome": "A research portfolio, evidence-based writing, and presentation-ready findings.",
+    },
+    "hospitality": {
+        "label": "Hospitality and customer experience",
+        "topics": [
+            "Service excellence and guest mindset",
+            "Clear communication and active listening",
+            "Conflict resolution and de-escalation",
+            "Front desk and booking workflows",
+            "Food safety and hygiene basics",
+            "Health, safety, and emergency procedures",
+            "Sales, upselling, and guest recovery",
+            "Team coordination under pressure",
+            "Cultural awareness and inclusivity",
+            "Complaint handling and service recovery",
+            "Brand standards and professionalism",
+            "Career portfolio and interview stories",
+        ],
+        "projects": [
+            "{role} service improvement case",
+            "Guest journey map with pain points",
+            "Staff training mini-module",
+            "Capstone: service recovery playbook",
+        ],
+        "assignments": [
+            "Role-play 5 difficult guest scenarios",
+            "Audit one guest journey end to end",
+            "Write a service recovery script",
+            "Complete a food safety or safety checklist",
+            "Interview one experienced professional",
+        ],
+        "tools": ["POS or booking system basics", "Service checklists", "Customer feedback forms", "Excel"],
+        "outcome": "Guest-ready communication, service recovery skill, and a professional portfolio.",
+    },
+    "general": {
+        "label": "Professional foundation",
+        "topics": [
+            "{role} foundations and terminology",
+            "{role} tools and daily workflows",
+            "Communication and professional writing",
+            "Research and information literacy",
+            "Problem solving and critical thinking",
+            "Time management and prioritization",
+            "Working with stakeholders",
+            "Quality standards and ethics",
+            "Data and spreadsheet basics",
+            "Presentation and storytelling",
+            "Networking and professional presence",
+            "Interview preparation and career stories",
+        ],
+        "projects": [
+            "{role} portfolio or work samples",
+            "{role} case study on a real problem",
+            "{role} 30-60-90 day plan",
+            "Capstone: end-to-end {role} project with proof",
+        ],
+        "assignments": [
+            "Research 10 job descriptions and extract repeat requirements",
+            "Build a toolkit checklist for the role",
+            "Complete 3 practice briefs or scenarios",
+            "Talk to 2 people working in the role",
+            "Write a 30-60-90 day plan with measurable goals",
+        ],
+        "tools": ["Excel or Google Sheets", "A notes system", "LinkedIn", "A portfolio page"],
+        "outcome": "A tailored portfolio, role-specific vocabulary, and a credible interview story.",
     },
 }
+
+CAREER_FAMILY_ALIASES = {
+    "software engineer": "software", "software developer": "software", "frontend developer": "software",
+    "front end developer": "software", "front-end developer": "software", "backend developer": "software",
+    "back end developer": "software", "back-end developer": "software", "full stack developer": "software",
+    "fullstack developer": "software", "web developer": "software", "web development": "software",
+    "mobile developer": "software", "android developer": "software", "ios developer": "software",
+    "app developer": "software", "game developer": "software", "qa engineer": "software",
+    "test engineer": "software", "devops engineer": "software", "cloud engineer": "software",
+    "site reliability engineer": "software", "embedded engineer": "software", "firmware engineer": "software",
+    "programmer": "software", "coding": "software", "developer": "software",
+    "data scientist": "data", "data analyst": "data", "data engineer": "data", "data science": "data",
+    "machine learning engineer": "data", "machine learning": "data", "ml engineer": "data",
+    "ai engineer": "data", "artificial intelligence": "data", "analytics engineer": "data",
+    "business intelligence": "data", "bi analyst": "data", "statistician": "data",
+    "deep learning": "data", "nlp engineer": "data", "computer vision": "data",
+    "product designer": "design", "ux designer": "design", "ui designer": "design",
+    "interaction designer": "design", "visual designer": "design", "graphic designer": "design",
+    "web designer": "design", "motion designer": "design", "animator": "design",
+    "illustrator": "design", "ux": "design", "ui": "design",
+    "product manager": "product", "project manager": "product", "program manager": "product",
+    "scrum master": "product", "product owner": "product", "business analyst": "product",
+    "management consultant": "product", "consultant": "product",
+    "digital marketing": "marketing", "content writer": "marketing", "copywriter": "marketing",
+    "social media": "marketing", "brand manager": "marketing", "growth marketer": "marketing",
+    "content strategist": "marketing", "email marketing": "marketing", "performance marketing": "marketing",
+    "public relations": "marketing", "marketing": "marketing", "seo": "marketing",
+    "financial analyst": "business", "investment banker": "business", "accountant": "business",
+    "accounting": "business", "auditor": "business", "economist": "business",
+    "business development": "business", "human resources": "business", "recruiter": "business",
+    "entrepreneur": "business", "founder": "business", "banker": "business",
+    "insurance": "business", "sales engineer": "business", "sales": "business", "finance": "business",
+    "registered nurse": "healthcare", "nurse": "healthcare", "nursing": "healthcare",
+    "physician": "healthcare", "doctor": "healthcare", "pharmacist": "healthcare",
+    "dentist": "healthcare", "physiotherapist": "healthcare", "psychologist": "healthcare",
+    "counselor": "healthcare", "nutritionist": "healthcare", "veterinarian": "healthcare",
+    "surgeon": "healthcare", "healthcare": "healthcare", "clinical": "healthcare",
+    "instructional designer": "education", "teacher": "education", "tutor": "education",
+    "professor": "education", "educator": "education", "trainer": "education",
+    "lecturer": "education", "teaching": "education",
+    "paralegal": "legal", "lawyer": "legal", "advocate": "legal", "legal": "legal",
+    "compliance officer": "legal", "judge": "legal", "law": "legal",
+    "civil engineer": "engineering", "mechanical engineer": "engineering", "electrical engineer": "engineering",
+    "electronics engineer": "engineering", "chemical engineer": "engineering",
+    "aerospace engineer": "engineering", "industrial engineer": "engineering",
+    "automobile engineer": "engineering", "structural engineer": "engineering",
+    "quantity surveyor": "engineering", "architect": "engineering", "engineer": "engineering",
+    "civil services": "public_service", "public administration": "public_service",
+    "public service": "public_service", "government": "public_service", "police": "public_service",
+    "defence": "public_service", "defense": "public_service", "air force": "public_service",
+    "army": "public_service", "navy": "public_service", "upsc": "public_service",
+    "supply chain": "operations", "logistics": "operations", "project coordinator": "operations",
+    "operations": "operations", "quality": "operations", "production": "operations",
+    "warehouse": "operations", "facilities": "operations", "procurement": "operations",
+    "inventory": "operations",
+    "research scientist": "science", "scientist": "science", "researcher": "science",
+    "biologist": "science", "chemist": "science", "physicist": "science",
+    "biotechnology": "science", "microbiologist": "science", "research": "science", "phd": "science",
+    "customer service": "hospitality", "customer support": "hospitality", "hospitality": "hospitality",
+    "hotel": "hospitality", "tourism": "hospitality", "chef": "hospitality",
+    "event manager": "hospitality", "flight attendant": "hospitality", "receptionist": "hospitality",
+    "travel": "hospitality",
+}
+CAREER_FAMILY_ALIASES = sorted(CAREER_FAMILY_ALIASES.items(), key=lambda pair: len(pair[0]), reverse=True)
 
 UPSC_TEMPLATE_TOPICS = [
     "Civil Services Preliminary: General Studies Paper I",
@@ -782,8 +1297,6 @@ UPSC_DEFAULT_SUBJECTS_BY_FOCUS = {
     "interview": ["foundation", "interview"],
 }
 
-OPENTDB_API = "https://opentdb.com/api.php"
-
 UPSC_OFFICIAL_GUIDANCE = {
     "full_journey": [
         "Anchor preparation on the official UPSC syllabus, previous year papers, and exam calendar.",
@@ -842,6 +1355,32 @@ def _safe_date(value, fallback=None):
         return fallback or _utc_today()
 
 
+def _safe_float(value, default, minimum=None, maximum=None):
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        parsed = default
+    if minimum is not None:
+        parsed = max(minimum, parsed)
+    if maximum is not None:
+        parsed = min(maximum, parsed)
+    return round(parsed, 1)
+
+
+def _study_dates(start_date, total_days, study_days_per_week):
+    """Study dates use fixed weekdays so the plan is predictable."""
+    study_days_per_week = _safe_int(study_days_per_week, 5, 1, 7)
+    total_days = max(int(total_days or 1), 1)
+    dates = []
+    cursor = start_date
+    end = start_date + timedelta(days=total_days - 1)
+    while cursor <= end:
+        if cursor.weekday() < study_days_per_week:
+            dates.append(cursor)
+        cursor += timedelta(days=1)
+    return dates or [start_date]
+
+
 def _embed_plan_preferences(raw_text, pace_mode):
     pace_mode = _normalize_pace_mode(pace_mode)
     base = (raw_text or "").strip()
@@ -859,6 +1398,15 @@ def _append_metadata_line(raw_text, label, value):
     if f"{label}:" in base:
         return base
     return f"{base}\n{label}: {value}".strip()
+
+
+def _replace_metadata_line(raw_text, label, value):
+    base = (raw_text or "").strip()
+    line = f"{label}: {value}"
+    pattern = re.compile(rf"^{re.escape(label)}:\s*.*$", re.MULTILINE | re.IGNORECASE)
+    if pattern.search(base):
+        return pattern.sub(lambda _match: line, base, count=1)
+    return f"{base}\n{line}".strip()
 
 
 def _extract_metadata_value(source_text, label, default=""):
@@ -888,96 +1436,290 @@ def _extract_profile_from_source_text(source_text):
     }
 
 
+_SYLLABUS_MODULE_HEADING_RE = re.compile(
+    r"^(?:unit|module|chapter|week|part|section|paper)\s*(?:no\.?)?\s*[-–—:.]?\s*"
+    r"(?:\d{1,2}|[ivxlcdm]{1,6}|[a-z])\b",
+    re.IGNORECASE,
+)
+_SYLLABUS_MODULE_ONLY_RE = re.compile(
+    r"^(?:unit|module|chapter|week|part|section|paper)\s*(?:no\.?)?\s*[-–—:.]?\s*"
+    r"(?:\d{1,2}|[ivxlcdm]{1,6}|[a-z])\s*[:\-–—.]*$",
+    re.IGNORECASE,
+)
+_SYLLABUS_CONTENTS_RE = re.compile(
+    r"^(?:course\s+contents?|course\s+topics?|syllabus|curriculum|topics?|contents?)\s*[:\-–—]?\s*$",
+    re.IGNORECASE,
+)
+_SYLLABUS_ADMIN_HEADING_RE = re.compile(
+    r"^(?:"
+    r"course\s+(?:objectives?|outcomes?|description|code|title|structure|delivery|policy|information)"
+    r"|program(?:me)?\s+outcomes?"
+    r"|learning\s+outcomes?"
+    r"|expected\s+outcomes?"
+    r"|teaching\s+scheme"
+    r"|examination\s+scheme"
+    r"|assessment\s+(?:scheme|pattern|methods?|criteria|details|plan)"
+    r"|evaluation\s+(?:scheme|pattern|criteria|methods?)"
+    r"|grading(?:\s+policy)?"
+    r"|attendance"
+    r"|prerequisites?"
+    r"|co-?requisites?"
+    r"|text\s*books?"
+    r"|reference\s+books?"
+    r"|recommended\s+(?:reading|books?)"
+    r"|required\s+reading"
+    r"|suggested\s+reading"
+    r"|further\s+reading"
+    r"|reading\s+list"
+    r"|web\s+resources"
+    r"|online\s+resources"
+    r"|faculty"
+    r"|instructor"
+    r"|course\s+coordinator"
+    r"|contact\s+(?:details|information)"
+    r"|office\s+hours"
+    r"|academic\s+integrity"
+    r"|plagiarism"
+    r"|grievance"
+    r"|mode\s+of\s+(?:examination|assessment)"
+    r"|scheme\s+of\s+(?:examination|evaluation)"
+    r"|list\s+of\s+(?:experiments|practical)"
+    r"|laboratory\s+work"
+    r"|project\s+work"
+    r"|general\s+instructions?"
+    r"|instructions?"
+    r")\b",
+    re.IGNORECASE,
+)
+_SYLLABUS_SKIP_REST_RE = re.compile(
+    r"^(?:text\s*books?|reference\s+books?|recommended\s+(?:reading|books?)|required\s+reading|"
+    r"suggested\s+reading|further\s+reading|reading\s+list|web\s+resources|online\s+resources)\b",
+    re.IGNORECASE,
+)
+_SYLLABUS_LINE_NOISE_RES = (
+    re.compile(r"^(?:page|pg\.?)\s*\d+(?:\s*(?:of|/)\s*\d+)?$", re.IGNORECASE),
+    re.compile(r"^(?:[-–—(]\s*)?\d{1,3}(?:\s*[-–—)])?$"),
+    re.compile(r"^\d{1,3}\s*(?:of|/)\s*\d{1,3}$"),
+    re.compile(r"^(?:semester|year|batch|session|term)\b.{0,30}$", re.IGNORECASE),
+    re.compile(r"^(?:max(?:imum)?|min(?:imum)?)\s*(?:marks|credits?)\b", re.IGNORECASE),
+    re.compile(r"^(?:total|grand\s+total)\b.*\d", re.IGNORECASE),
+    re.compile(r"^\d+(?:\.\d+)?\s*(?:credits?|marks?|hours?|hrs?|periods?|weeks?|days?)\b", re.IGNORECASE),
+    re.compile(r"^(?:theory|practical|tutorial|lab|laboratory|internal|external)\s*[:\-–]?\s*\d+", re.IGNORECASE),
+    re.compile(r"^(?:l\s*[-–:]\s*t\s*[-–:]\s*p|\d+\s*[-–]\s*\d+\s*[-–]\s*\d+)\b", re.IGNORECASE),
+    re.compile(r"^[A-Z]{2,6}\s*[-–]?\s*\d{2,4}[A-Z]?$"),
+    re.compile(r"^(?:e-?mail|phone|mobile|contact)\s*[:\-]", re.IGNORECASE),
+    re.compile(r"^[\w.+-]+@[\w.-]+\.\w+$"),
+    re.compile(r"^(?:note|notes)\s*[:\-]", re.IGNORECASE),
+    re.compile(r"^academic\s+year\b", re.IGNORECASE),
+    re.compile(r"^(?:program(?:me)?|branch|specialization|discipline|course|subject|paper)\s*[:\-]", re.IGNORECASE),
+    re.compile(r"^(?:name\s+of\s+the\s+(?:course|program(?:me)?)|course\s+name)\b", re.IGNORECASE),
+    re.compile(
+        r"^(?:b\.?\s*sc|b\.?\s*a|b\.?\s*com|b\.?\s*tech|bca|mca|m\.?\s*sc|m\.?\s*a|mba|"
+        r"ph\.?\s*d|b\.?\s*ed|m\.?\s*ed)\b",
+        re.IGNORECASE,
+    ),
+)
+_SYLLABUS_METADATA_RE = re.compile(
+    r"^(?:pace mode|current level|deadline pressure|confidence level|weak areas|workflow mode|"
+    r"target outcome|career family|career toolkit|career outcome|plan topics)\s*:",
+    re.IGNORECASE,
+)
+_SYLLABUS_OBJECTIVE_RE = re.compile(
+    r"\b(?:students?\s+will|learners?\s+will|the\s+student|this\s+course|the\s+course|"
+    r"upon\s+completion|by\s+the\s+end\s+of|aims?\s+to|ability\s+to|enable\s+students?|"
+    r"develop\s+an\s+understanding|introduce\s+students?|familiarize\s+students?|"
+    r"provide\s+students?)\b",
+    re.IGNORECASE,
+)
+_SYLLABUS_OBJECTIVE_START_RE = re.compile(
+    r"^(?:understand|explain|describe|discuss|identify|apply|analy[sz]e|evaluate|demonstrate|"
+    r"develop)\s+(?:the|how|why|various|different|basic|key|major)\b",
+    re.IGNORECASE,
+)
+_SYLLABUS_GENERIC_TOPICS = {
+    "introduction", "intro", "overview", "basics", "fundamentals", "general",
+    "miscellaneous", "others", "practical", "practicals", "theory", "lab", "labs",
+    "laboratory", "project", "projects", "assignment", "assignments", "seminar",
+    "workshop", "tutorial", "tutorials", "revision", "examination", "examinations",
+    "test", "tests", "quiz", "quizzes", "note", "notes", "references", "textbooks",
+    "syllabus", "contents", "topics", "unit", "units", "module", "modules",
+    "chapter", "chapters", "part", "parts", "data", "information",
+}
+
+
+def _clean_syllabus_topic(raw):
+    text = (raw or "").strip(" \t-*•–—,;:")
+    text = re.sub(
+        r"\(\s*(?:[A-Z]{2,6}[\s-]?\d{2,4}[A-Z]?|elective\s*[- ]?\d+)\s*\)",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"^(?:unit|module|chapter|week|topic|section|part|paper)\s*(?:no\.?)?\s*[-–—:.]?\s*"
+        r"(?:\d{1,2}|[ivxlcdm]{1,6}|[a-z])\b\s*[:\-–—.]*\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"^\(?(?:\d+(?:\.\d+)*|[ivxlcdm]+|[a-z])[\).:\-–]\s+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text).strip(" ,;:-–—.")
+    return text
+
+
+def _split_syllabus_parts(text):
+    if ";" not in text and "," not in text:
+        return [text]
+    parts = []
+    buffer = []
+    depth = 0
+    for char in text:
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth = max(depth - 1, 0)
+        if depth == 0 and char in ";,":
+            parts.append("".join(buffer))
+            buffer = []
+            continue
+        buffer.append(char)
+    parts.append("".join(buffer))
+    cleaned = [re.sub(r"\s+", " ", part).strip(" .;:-") for part in parts]
+    cleaned = [part for part in cleaned if part]
+    if len(cleaned) <= 1:
+        return [text]
+    if all(len(part.split()) == 1 for part in cleaned) and " and " not in text.lower() and "&" not in text:
+        return [text]
+    return cleaned
+
+
+def _is_syllabus_noise_line(line):
+    if any(pattern.match(line) for pattern in _SYLLABUS_LINE_NOISE_RES):
+        return True
+    if len(line.split()) <= 8 and re.search(
+        r"\b(?:university|college|institute|department|school\s+of|faculty\s+of)\b",
+        line,
+        re.IGNORECASE,
+    ):
+        return True
+    return False
+
+
 def _extract_topics_from_text(text):
-    if not text:
-        return []
-    return _extract_topics_rulebased(text)
+    return _extract_topics_with_stats(text)[0]
 
 
-def _extract_topics_rulebased(text):
+def _extract_topics_with_stats(text):
+    """Extract real syllabus topics while discarding administrative noise.
+
+    Sections such as course objectives, outcomes, credits, textbooks, and
+    references are skipped until the next unit/module heading. Inline lists are
+    split on commas and semicolons outside parentheses, and generic headings
+    like "Unit 1" or "Course Contents" never become topics.
+    """
+    stats = {"raw_lines": 0, "noise_lines": 0, "topics": 0}
     if not text:
-        return []
+        return [], stats
+
+    lines = []
+    for chunk in str(text).replace("\r", "\n").split("\n"):
+        line = chunk.replace("\u00a0", " ")
+        line = re.sub(r"^\s*[•▪◦‣·●○–—>›*-]+\s*", "", line)
+        line = re.sub(r"\s+", " ", line).strip()
+        if line:
+            lines.append(line)
+    stats["raw_lines"] = len(lines)
+
     candidates = []
-    lines = [l.strip() for l in text.splitlines() if l and l.strip()]
+    seen = set()
+    noise_count = 0
+    in_admin_section = False
+    admin_line_count = 0
+    skip_rest = False
 
-    stop_phrases = [
-        "course objective", "course objectives", "course outcome", "course outcomes",
-        "learning outcome", "learning outcomes", "teaching scheme", "examination scheme",
-        "grading", "evaluation", "assessment", "textbook", "reference book",
-        "credits", "marks", "attendance", "prerequisite", "prerequisites",
-        "instructions", "note:", "notes:", "recommended", "required reading",
-        "syllabus", "syllabi", "course contents", "course content", "list of experiments",
-    ]
-    noise_words = {"introduction", "overview", "basics", "fundamentals", "general"}
+    def push(item):
+        cleaned = _clean_syllabus_topic(item)
+        cleaned = re.sub(r"^(?:and|&|including|such as|e\.g\.?|i\.e\.?|etc\.?)\s+", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s+(?:etc\.?|and|or)$", "", cleaned, flags=re.IGNORECASE)
+        if not cleaned:
+            return False
+        if not re.search(r"[A-Za-z]{2}", cleaned):
+            return False
+        lower = cleaned.lower()
+        if lower in _SYLLABUS_GENERIC_TOPICS:
+            return False
+        if _SYLLABUS_OBJECTIVE_RE.search(cleaned) or _SYLLABUS_OBJECTIVE_START_RE.match(cleaned):
+            return False
+        words = cleaned.split()
+        if len(words) > 12 or len(cleaned) > 110:
+            return False
+        digits = sum(1 for char in cleaned if char.isdigit())
+        if digits and digits / max(len(cleaned), 1) > 0.3:
+            return False
+        key = re.sub(r"[^a-z0-9]+", " ", lower).strip()
+        if not key or key in seen:
+            return False
+        seen.add(key)
+        candidates.append(cleaned)
+        return True
 
-    def _is_noise(line_lower):
-        return any(phrase in line_lower for phrase in stop_phrases)
-
-    def _clean_heading(raw):
-        cleaned = raw.strip(" \t-*")
-        cleaned = re.sub(
-            r"^(unit|module|chapter|week|topic|section|part)\s*\d+[a-zA-Z]*[:\).\-\s]*",
-            "",
-            cleaned,
-            flags=re.IGNORECASE,
-        )
-        cleaned = re.sub(r"^\(?[0-9ivxlcdm]+[\)\.\-:]*\s*", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"^[A-Za-z][\)\.\-:]\s*", "", cleaned)
-        return cleaned.strip()
-
-    def _push_candidate(item):
-        if not item:
-            return
-        normalized = re.sub(r"\s+", " ", item).strip(" ,;:-")
-        if not normalized:
-            return
-        if not any(ch.isalpha() for ch in normalized):
-            return
-        words = normalized.split()
-        if len(words) > 10:
-            return
-        if len(words) == 1:
-            if len(normalized) < 5 or normalized.lower() in noise_words:
-                return
-        elif len(words) < 2:
-            return
-        if len(normalized) > 90:
-            return
-        candidates.append(normalized)
+    def push_line(content):
+        accepted = False
+        for part in _split_syllabus_parts(content):
+            if push(part):
+                accepted = True
+        return accepted
 
     for line in lines:
-        line_lower = line.lower()
-        if _is_noise(line_lower):
+        if _SYLLABUS_METADATA_RE.match(line) or _is_syllabus_noise_line(line):
+            noise_count += 1
             continue
 
-        cleaned = _clean_heading(line)
-
-        if ":" in cleaned and len(cleaned.split(":", 1)[0].split()) <= 3:
-            right = cleaned.split(":", 1)[1].strip()
-            _push_candidate(right)
+        if _SYLLABUS_SKIP_REST_RE.match(line):
+            skip_rest = True
+            noise_count += 1
+            continue
+        if skip_rest:
+            noise_count += 1
             continue
 
-        if len(cleaned) <= 140 and (";" in cleaned or "," in cleaned):
-            parts = re.split(r"[;,]", cleaned)
-            for part in parts:
-                _push_candidate(_clean_heading(part))
+        is_module = bool(_SYLLABUS_MODULE_HEADING_RE.match(line))
+        is_contents = bool(_SYLLABUS_CONTENTS_RE.match(line))
+
+        if _SYLLABUS_ADMIN_HEADING_RE.match(line) and not is_module:
+            in_admin_section = True
+            admin_line_count = 0
+            noise_count += 1
             continue
 
-        if " - " in cleaned:
-            left, right = [p.strip() for p in cleaned.split(" - ", 1)]
-            _push_candidate(right or left)
+        if is_module or is_contents:
+            in_admin_section = False
+            admin_line_count = 0
+            if is_contents or _SYLLABUS_MODULE_ONLY_RE.match(line):
+                noise_count += 1
+                continue
+            if not push_line(_clean_syllabus_topic(line)):
+                noise_count += 1
             continue
 
-        _push_candidate(cleaned)
+        if in_admin_section:
+            admin_line_count += 1
+            if admin_line_count <= 22:
+                noise_count += 1
+                continue
+            in_admin_section = False
 
-    unique = []
-    seen = set()
-    for item in candidates:
-        key = item.lower()
-        if key not in seen:
-            seen.add(key)
-            unique.append(item)
-    return unique[:80]
+        content = _clean_syllabus_topic(line)
+        if ":" in content:
+            left, right = content.split(":", 1)
+            if right.strip() and len(left.split()) <= 4 and re.search(r"[A-Za-z]", right):
+                content = right.strip()
+        if not push_line(content):
+            noise_count += 1
+
+    stats["noise_lines"] = noise_count
+    stats["topics"] = len(candidates)
+    return candidates[:80], stats
 
 
 
@@ -1027,6 +1769,8 @@ def _request_session():
 
 
 def _safe_get(url, headers=None, params=None):
+    if not current_app.config.get("ENABLE_EXTERNAL_RESOURCES", True):
+        return None
     try:
         timeout = current_app.config.get("REQUEST_TIMEOUT_SECONDS", 8)
         response = _request_session().get(url, headers=headers, params=params, timeout=timeout)
@@ -1038,6 +1782,8 @@ def _safe_get(url, headers=None, params=None):
 
 
 def _safe_get_text(url, headers=None, params=None):
+    if not current_app.config.get("ENABLE_EXTERNAL_RESOURCES", True):
+        return None
     try:
         timeout = current_app.config.get("REQUEST_TIMEOUT_SECONDS", 8)
         response = _request_session().get(url, headers=headers, params=params, timeout=timeout)
@@ -1048,115 +1794,64 @@ def _safe_get_text(url, headers=None, params=None):
     return None
 
 
-def _extract_labels_from_obj(obj):
-    labels = []
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            if key in ["preferredLabel", "prefLabel", "title", "name"]:
-                if isinstance(value, dict):
-                    labels.extend([v for v in value.values() if isinstance(v, str)])
-                elif isinstance(value, str):
-                    labels.append(value)
-            else:
-                labels.extend(_extract_labels_from_obj(value))
-    elif isinstance(obj, list):
-        for item in obj:
-            labels.extend(_extract_labels_from_obj(item))
-    return labels
+def _classify_career_family(title):
+    key = _normalize(title or "")
+    for alias, family in CAREER_FAMILY_ALIASES:
+        if alias in key:
+            return family
+    return "general"
 
 
-def _fetch_career_template_esco(query):
-    base = current_app.config.get("ESCO_API_BASE", "https://ec.europa.eu/esco/api")
-    headers = {"User-Agent": current_app.config.get("WIKIPEDIA_USER_AGENT")}
-    search_params = {
-        "type": "occupation",
-        "text": query,
-        "language": "en",
-        "limit": 1,
-        "full": "false"
-    }
-    search_url = f"{base}/search"
-    search_data = _safe_get(search_url, headers=headers, params=search_params)
-    if not search_data:
-        return []
-
-    occupation_uri = None
-    if isinstance(search_data, dict):
-        if "results" in search_data and isinstance(search_data["results"], list) and search_data["results"]:
-            occupation_uri = search_data["results"][0].get("uri") or search_data["results"][0].get("id")
-        if not occupation_uri and "_embedded" in search_data:
-            for value in search_data["_embedded"].values():
-                if isinstance(value, list) and value:
-                    occupation_uri = value[0].get("uri") or value[0].get("id")
-                    if occupation_uri:
-                        break
-    if not occupation_uri:
-        return []
-
-    detail_url = f"{base}/resource/occupation"
-    detail_data = _safe_get(detail_url, headers=headers, params={"uri": occupation_uri, "language": "en"})
-    if not detail_data:
-        return []
-
-    labels = _extract_labels_from_obj(detail_data)
-    cleaned = []
+def _dedupe_items(items):
     seen = set()
-    for label in labels:
-        normalized = re.sub(r"\s+", " ", label).strip()
-        if 2 <= len(normalized) <= 80:
-            key = normalized.lower()
-            if key not in seen:
-                seen.add(key)
-                cleaned.append(normalized)
-    return cleaned[:40]
+    cleaned = []
+    for item in items:
+        text = re.sub(r"\s+", " ", (item or "")).strip()
+        key = _normalize(text)
+        if text and key not in seen:
+            seen.add(key)
+            cleaned.append(text)
+    return cleaned
 
 
-def _ensure_upsc_question_bank():
-    if Question.query.filter_by(exam="UPSC").first():
-        return
-    questions = []
-    for topic in UPSC_TEMPLATE_TOPICS:
-        questions.append({
-            "exam": "UPSC",
-            "subject": topic.split(":")[0],
-            "topic": topic,
-            "question_text": f"Explain the key ideas in {topic} and mention two recent examples.",
-            "answer_text": "Answer outline: define terms, list core concepts, add recent example and impact.",
-            "difficulty": "medium"
-        })
-        questions.append({
-            "exam": "UPSC",
-            "subject": topic.split(":")[0],
-            "topic": topic,
-            "question_text": f"Write a 150-word note on {topic}.",
-            "answer_text": "Answer outline: intro (2-3 lines), body (key points), conclusion (future direction).",
-            "difficulty": "medium"
-        })
-    for item in questions[:240]:
-        db.session.add(Question(**item))
-    db.session.commit()
+def _build_career_plan(role_title, source_text="", level="beginner", target_outcome=""):
+    role = (role_title or "").strip() or "Career Path"
+    family_key = _classify_career_family(role)
+    family = CAREER_FAMILIES[family_key]
 
+    def fill(items):
+        return [item.format(role=role, family=family["label"]) for item in items]
 
-def _fetch_opentdb_questions(amount=10, difficulty="medium"):
-    params = {"amount": amount, "type": "multiple", "difficulty": difficulty}
-    data = _safe_get(OPENTDB_API, params=params)
-    if not data or data.get("response_code") != 0:
-        return []
-    questions = []
-    for item in data.get("results", []):
-        question = item.get("question")
-        correct = item.get("correct_answer")
-        incorrect = item.get("incorrect_answers", [])
-        options = incorrect + [correct]
-        random.shuffle(options)
-        questions.append({
-            "question": question,
-            "options": options,
-            "answer": correct,
-            "category": item.get("category"),
-            "source": "Open Trivia DB",
-        })
-    return questions
+    topics = fill(family["topics"])
+    projects = fill(family["projects"])
+    assignments = fill(family["assignments"])
+
+    level_key = _normalize(level)
+    level_focus = {
+        "beginner": f"{role} foundations and vocabulary",
+        "intermediate": f"{role} applied practice with real scenarios",
+        "advanced": f"{role} advanced patterns and leadership decisions",
+    }.get(level_key)
+    if level_focus:
+        topics.insert(0, level_focus)
+
+    if target_outcome:
+        projects.append(f"Outcome proof: {target_outcome}")
+
+    if family["tools"]:
+        assignments.append(f"Set up and practice your core toolkit: {', '.join(family['tools'])}")
+
+    topics.extend(_extract_topics_from_text(source_text))
+    return {
+        "role": role,
+        "family": family_key,
+        "family_label": family["label"],
+        "topics": _dedupe_items(topics)[:14],
+        "projects": _dedupe_items(projects)[:5],
+        "assignments": _dedupe_items(assignments)[:6],
+        "tools": family["tools"],
+        "outcome": family["outcome"],
+    }
 
 
 def _supabase_client():
@@ -1165,59 +1860,6 @@ def _supabase_client():
     if not url or not key:
         return None
     return create_client(url, key)
-
-
-def _ai_extract_topics(text):
-    api_key = current_app.config.get("OPENAI_API_KEY")
-    model = current_app.config.get("OPENAI_MODEL")
-    if not api_key or not model:
-        return []
-    prompt = (
-        "Extract a clean JSON array of unique topic strings from the syllabus text. "
-        "Keep each topic short (3-8 words). Return ONLY JSON.\n\n"
-        f"Syllabus:\n{text[:8000]}"
-    )
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": model,
-        "input": [
-            {"role": "system", "content": "You extract concise topics from messy syllabi."},
-            {"role": "user", "content": prompt}
-        ],
-        "max_output_tokens": 600
-    }
-    try:
-        timeout = current_app.config.get("REQUEST_TIMEOUT_SECONDS", 8)
-        response = _request_session().post("https://api.openai.com/v1/responses", headers=headers, json=payload, timeout=timeout)
-        if response.status_code != 200:
-            return []
-        data = response.json()
-        raw = None
-        if isinstance(data, dict):
-            raw = data.get("output_text")
-            if not raw and data.get("output"):
-                for item in data["output"]:
-                    for content in item.get("content", []):
-                        if content.get("type") == "output_text":
-                            raw = content.get("text")
-                            break
-        if not raw:
-            return []
-        try:
-            import json
-            parsed = json.loads(raw)
-            if isinstance(parsed, list):
-                return [str(x).strip() for x in parsed if str(x).strip()]
-        except Exception:
-            return _extract_topics_from_text(raw)
-    except Exception:
-        return []
-    return []
-
-
 
 
 def _estimate_difficulty(topic):
@@ -1235,6 +1877,8 @@ def _estimate_hours(topic):
     extra = min(words * 0.2, 2.0)
     if "project" in topic.lower():
         base += 2.0
+    if "assignment" in topic.lower():
+        base += 1.0
     if "capstone" in topic.lower():
         base += 3.0
     return round(base + extra, 1)
@@ -1246,34 +1890,142 @@ def _resource_score(provider):
         "crossref": 0.9,
         "github": 0.7,
         "openalex": 0.85,
+        "openlibrary": 0.75,
     }
     return scores.get(provider, 0.6)
+
+
+def _resource_headers():
+    return {"User-Agent": current_app.config.get("WIKIPEDIA_USER_AGENT")}
+
+
+def _wikipedia_resource(topic):
+    headers = _resource_headers()
+    search_data = _safe_get(
+        "https://en.wikipedia.org/w/api.php",
+        headers=headers,
+        params={
+            "action": "opensearch",
+            "search": topic,
+            "limit": 1,
+            "namespace": 0,
+            "format": "json",
+        },
+    )
+    title = topic
+    if isinstance(search_data, list) and len(search_data) > 1 and search_data[1]:
+        title = str(search_data[1][0])
+    summary = _safe_get(
+        f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(title.replace(' ', '_'), safe='')}",
+        headers=headers,
+    )
+    if not isinstance(summary, dict) or not summary.get("content_urls"):
+        return None
+    return {
+        "provider": "wikipedia",
+        "title": summary.get("title", title),
+        "url": summary["content_urls"]["desktop"]["page"],
+        "summary": summary.get("extract", ""),
+        "score": _resource_score("wikipedia"),
+    }
+
+
+def _openalex_resources(topic, headers):
+    params = {"search": topic, "per-page": 2}
+    mailto = current_app.config.get("OPENALEX_EMAIL")
+    if mailto:
+        params["mailto"] = mailto
+    data = _safe_get("https://api.openalex.org/works", headers=headers, params=params)
+    results = data.get("results") if isinstance(data, dict) else None
+    resources = []
+    for item in (results or [])[:2]:
+        if not isinstance(item, dict):
+            continue
+        url = item.get("doi") or (
+            (item.get("primary_location") or {}).get("landing_page_url")
+        )
+        title = item.get("display_name") or topic
+        if not url:
+            continue
+        year = item.get("publication_year")
+        resources.append({
+            "provider": "openalex",
+            "title": str(title)[:220],
+            "url": str(url),
+            "summary": f"Open-access research reference{f' ({year})' if year else ''}",
+            "score": _resource_score("openalex"),
+        })
+    return resources
+
+
+def _openlibrary_resources(topic, headers):
+    data = _safe_get(
+        "https://openlibrary.org/search.json",
+        headers=headers,
+        params={
+            "q": topic,
+            "limit": 2,
+            "fields": "title,key,author_name,first_publish_year",
+        },
+    )
+    docs = data.get("docs") if isinstance(data, dict) else None
+    resources = []
+    for item in (docs or [])[:2]:
+        if not isinstance(item, dict) or not item.get("key"):
+            continue
+        authors = item.get("author_name") or []
+        year = item.get("first_publish_year")
+        detail = ", ".join(filter(None, [authors[0] if authors else None, str(year) if year else None]))
+        resources.append({
+            "provider": "openlibrary",
+            "title": str(item.get("title") or topic)[:220],
+            "url": f"https://openlibrary.org{item['key']}",
+            "summary": f"Free library book{f' · {detail}' if detail else ''}",
+            "score": _resource_score("openlibrary"),
+        })
+    return resources
+
+
+def _url_looks_dead(url):
+    if not current_app.config.get("RESOURCE_VERIFY_URLS", True):
+        return False
+    try:
+        timeout = min(4, current_app.config.get("REQUEST_TIMEOUT_SECONDS", 8))
+        response = _request_session().head(url, allow_redirects=True, timeout=timeout)
+        return response.status_code in {404, 410}
+    except Exception:
+        # A blocked or slow HEAD request is not proof that the link is dead.
+        return False
+
+
+def _dedupe_resources(resources, limit=6):
+    seen = set()
+    kept = []
+    for item in resources:
+        url = (item.get("url") or "").strip()
+        if not url or url in seen:
+            continue
+        if _url_looks_dead(url):
+            continue
+        seen.add(url)
+        kept.append(item)
+        if len(kept) >= limit:
+            break
+    return kept
 
 
 def _fetch_resources_for_topic(topic):
     if not current_app.config.get("ENABLE_EXTERNAL_RESOURCES", True):
         return []
 
+    headers = _resource_headers()
     resources = []
-    user_agent = current_app.config.get("WIKIPEDIA_USER_AGENT")
-    headers = {"User-Agent": user_agent}
 
-    wiki_title = quote(topic.replace(" ", "_"))
-    wiki_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{wiki_title}"
-    wiki_data = _safe_get(wiki_url, headers=headers)
-    if wiki_data and wiki_data.get("content_urls"):
-        resources.append({
-            "provider": "wikipedia",
-            "title": wiki_data.get("title", topic),
-            "url": wiki_data["content_urls"]["desktop"]["page"],
-            "summary": wiki_data.get("extract", ""),
-            "score": _resource_score("wikipedia")
-        })
+    wiki = _wikipedia_resource(topic)
+    if wiki:
+        resources.append(wiki)
 
-    crossref_params = {
-        "query.title": topic,
-        "rows": 2,
-    }
+    crossref_params = {"query.title": topic, "rows": 2}
     if current_app.config.get("CROSSREF_MAILTO"):
         crossref_params["mailto"] = current_app.config["CROSSREF_MAILTO"]
     crossref_data = _safe_get("https://api.crossref.org/works", headers=headers, params=crossref_params)
@@ -1290,7 +2042,10 @@ def _fetch_resources_for_topic(topic):
                     "score": _resource_score("crossref")
                 })
 
-    github_headers = {"Accept": "application/vnd.github+json", "User-Agent": user_agent}
+    resources.extend(_openalex_resources(topic, headers))
+    resources.extend(_openlibrary_resources(topic, headers))
+
+    github_headers = {"Accept": "application/vnd.github+json", "User-Agent": headers["User-Agent"]}
     token = current_app.config.get("GITHUB_TOKEN")
     if token:
         github_headers["Authorization"] = f"Bearer {token}"
@@ -1306,41 +2061,71 @@ def _fetch_resources_for_topic(topic):
                 "score": _resource_score("github")
             })
 
-    return resources
+    limit = max(int(current_app.config.get("RESOURCE_MAX_ITEMS", 6) or 6), 1)
+    return _dedupe_resources(resources, limit=limit)
 
 
-def _schedule_items(items, start_date, timeline_weeks, hours_per_week, study_days_per_week, pace_mode="steady"):
+def _schedule_items(items, start_date, timeline_weeks, hours_per_week, study_days_per_week,
+                   pace_mode="steady", plan_days=None, hours_per_day=None):
+    """Place sequential tasks on real study days at the user's daily capacity.
+
+    The due dates fan out across the whole requested window instead of
+    finishing early, so a 60-day plan actually stretches over 60 days.
+    If the requested window cannot hold the work, the plan is extended to
+    the first date where it fits rather than silently overloading days.
+    """
     tasks = []
     if not items:
         items = ["Define milestones", "Gather resources", "Start learning", "Build a mini project"]
 
-    estimated_hours = [_estimate_hours(item) for item in items]
-    total_hours = sum(estimated_hours) or 1
+    study_days_per_week = _safe_int(study_days_per_week, 5, 1, 7)
     pace_mode = _normalize_pace_mode(pace_mode)
     pace_multiplier = {
-        "burnout_safe": 1.2,
+        "burnout_safe": 1.15,
         "steady": 1.0,
         "sprint": 0.85,
     }[pace_mode]
-    if timeline_weeks and timeline_weeks > 0:
+
+    estimated_hours = [_estimate_hours(item) for item in items]
+    total_hours = round(sum(estimated_hours), 1) or 1.0
+
+    if hours_per_day is None:
+        hours_per_day = (hours_per_week or 6) / study_days_per_week
+    hours_per_day = _safe_float(hours_per_day, 2.0, 0.5, 16.0)
+
+    if plan_days and plan_days > 0:
+        total_days = max(int(plan_days), 1)
+    elif timeline_weeks and timeline_weeks > 0:
         total_days = max(timeline_weeks * 7, 7)
     else:
-        total_days = max(math.ceil(total_hours / max(hours_per_week, 1) * 7 * pace_multiplier), 7)
+        required_study_days = math.ceil((total_hours * pace_multiplier) / hours_per_day)
+        required_weeks = math.ceil(required_study_days / study_days_per_week)
+        total_days = max(required_weeks * 7, 7)
 
-    current_date = start_date
+    dates = _study_dates(start_date, total_days, study_days_per_week)
+    capacity = len(dates) * hours_per_day
+    while capacity + 0.01 < total_hours:
+        total_days += 7
+        dates = _study_dates(start_date, total_days, study_days_per_week)
+        capacity = len(dates) * hours_per_day
+
+    cursor_hours = 0.0
+    last_index = 0
     for idx, item in enumerate(items):
-        share = estimated_hours[idx] / total_hours
-        task_days = max(1, math.ceil(total_days * share))
-        due_date = current_date + timedelta(days=task_days)
+        cursor_hours += estimated_hours[idx]
+        fraction = min(cursor_hours / total_hours, 1.0)
+        day_index = int(round(fraction * (len(dates) - 1)))
+        day_index = max(day_index, last_index)
+        last_index = day_index
         tasks.append({
             "title": item,
             "order_index": idx + 1,
-            "due_date": due_date,
+            "due_date": dates[day_index],
             "difficulty": _estimate_difficulty(item),
-            "estimated_hours": estimated_hours[idx]
+            "estimated_hours": estimated_hours[idx],
         })
-        current_date = due_date
-    return tasks, total_hours, current_date
+
+    return tasks, total_hours, dates[-1]
 
 
 def _auto_adjust_roadmap_timeline(roadmap, start_date=None, timeline_weeks=0):
@@ -1370,6 +2155,8 @@ def _auto_adjust_roadmap_timeline(roadmap, start_date=None, timeline_weeks=0):
         roadmap.hours_per_week,
         roadmap.study_days_per_week,
         _extract_pace_mode_from_source_text(roadmap.source_text),
+        plan_days=roadmap.plan_days,
+        hours_per_day=roadmap.hours_per_day,
     )
 
     for task, spec in zip(remaining_tasks, task_specs):
@@ -1486,8 +2273,8 @@ def _build_progress_story(roadmap, attempts, quiz_results):
     recent_checkins = []
     previous_checkins = []
     if _has_table("checkin"):
-        month_start = _utc_now() - timedelta(days=30)
-        previous_start = _utc_now() - timedelta(days=60)
+        month_start = _utc_now().replace(tzinfo=None) - timedelta(days=30)
+        previous_start = _utc_now().replace(tzinfo=None) - timedelta(days=60)
         recent_checkins = Checkin.query.filter_by(roadmap_id=roadmap.id).filter(Checkin.created_at >= month_start).all()
         previous_checkins = Checkin.query.filter_by(roadmap_id=roadmap.id).filter(Checkin.created_at >= previous_start, Checkin.created_at < month_start).all()
     if roadmap.streak >= 3:
@@ -1541,6 +2328,150 @@ def _build_dashboard_insights(roadmaps):
     ]
 
 
+def _build_momentum_status(roadmaps, tasks=None, checkins=None, next_task=None):
+    """Derive a live title, badges, and a motivating message from real progress."""
+    roadmaps = list(roadmaps or [])
+    today = _utc_today()
+    if not roadmaps:
+        return {
+            "title": "Starting Line",
+            "tone": "positive",
+            "score": 0,
+            "message": "Every roadmap starts with one small step. Create your first plan and we will turn the goal into daily actions.",
+            "done": 0,
+            "total": 0,
+            "overdue": 0,
+            "streak": 0,
+            "badges": [],
+            "next_badge": None,
+            "days_since_checkin": None,
+        }
+
+    roadmap_ids = [item.id for item in roadmaps]
+    if tasks is None:
+        tasks = Task.query.filter(Task.roadmap_id.in_(roadmap_ids)).all()
+    task_list = list(tasks)
+    if checkins is None:
+        checkins = Checkin.query.filter(Checkin.roadmap_id.in_(roadmap_ids)).all() if _has_table("checkin") else []
+
+    total = len(task_list)
+    done_tasks = [task for task in task_list if task.status == "done"]
+    done = len(done_tasks)
+    overdue = len([task for task in task_list if task.status != "done" and task.due_date and task.due_date < today])
+    on_time = len([task for task in done_tasks if not task.due_date or not task.completed_at or task.completed_at.date() <= task.due_date])
+    project_tasks = [task for task in task_list if task.title.startswith("Project:")]
+    completed_projects = len([task for task in project_tasks if task.status == "done"])
+    completion = done / total if total else 0.0
+    on_time_ratio = on_time / done if done else 0.0
+    streak = max([int(roadmap.streak or 0) for roadmap in roadmaps] or [0])
+
+    checkin_dates = [item.checkin_date for item in checkins if item.checkin_date]
+    checkin_dates.extend(roadmap.last_checkin_date for roadmap in roadmaps if roadmap.last_checkin_date)
+    last_checkin = max(checkin_dates) if checkin_dates else None
+    days_since_checkin = max((today - last_checkin).days, 0) if last_checkin else None
+    recent_checkins = len({day for day in checkin_dates if 0 <= (today - day).days <= 7})
+    consistency = (min(streak / 7, 1.0) * 0.5) + (min(recent_checkins / 3, 1.0) * 0.5)
+
+    score = round(completion * 55 + on_time_ratio * 25 + consistency * 20)
+    score = max(0, min(100, score - min(overdue * 6, 30)))
+
+    start_dates = [roadmap.start_date for roadmap in roadmaps if roadmap.start_date]
+    plan_age = max((today - min(start_dates)).days, 0) if start_dates else 0
+    stale = days_since_checkin is not None and days_since_checkin >= 7
+    silent_start = total > 0 and done == 0 and plan_age >= 7
+
+    if total and done >= total:
+        title, tone = "Roadmap Finisher", "positive"
+    elif overdue >= 5 or (overdue >= 2 and stale) or (silent_start and plan_age >= 10):
+        title, tone = "Momentum at Risk", "danger"
+    elif overdue >= 1 or stale or silent_start:
+        title, tone = "Catching Up", "warning"
+    elif score >= 75:
+        title, tone = "Momentum Architect", "positive"
+    elif score >= 55:
+        title, tone = "Momentum Builder", "positive"
+    elif score >= 35:
+        title, tone = "Steady Climber", "positive"
+    elif done > 0:
+        title, tone = "Momentum Starter", "positive"
+    else:
+        title, tone = "Fresh Start", "positive"
+
+    badge_specs = [
+        ("First Step", "Complete your first task", done >= 1, done, 1),
+        ("Five Wins", "Complete five tasks", done >= 5, done, 5),
+        ("Ten Down", "Complete ten tasks", done >= 10, done, 10),
+        ("Streak Starter", "Keep a 3-day study streak", streak >= 3, streak, 3),
+    ]
+    if project_tasks:
+        badge_specs.append(("Project Shipper", "Finish your first project", completed_projects >= 1, completed_projects, 1))
+    if total:
+        badge_specs.append(("Halfway Hero", "Reach 50% plan completion", completion >= 0.5, round(completion * 100), 50))
+    badge_specs.append(("Consistency Keeper", "Keep a 7-day study streak", streak >= 7, streak, 7))
+    if project_tasks:
+        badge_specs.append(("Portfolio Proof", "Finish every project in the plan", completed_projects >= len(project_tasks), completed_projects, len(project_tasks)))
+    if total:
+        badge_specs.append(("Roadmap Finisher", "Complete every task in the plan", done >= total, done, total))
+
+    badges = [
+        {"name": name, "detail": detail, "tone": "positive"}
+        for name, detail, earned, _, _ in badge_specs if earned
+    ]
+
+    delay_badges = []
+    if overdue >= 5:
+        delay_badges.append({"name": "Overdue Stack", "detail": f"{overdue} tasks are past due. Clear the smallest one first.", "tone": "danger"})
+    elif overdue >= 1:
+        delay_badges.append({"name": "Delay Alert", "detail": f"{overdue} task(s) are past due. One focused session restores control.", "tone": "warning"})
+    if stale:
+        delay_badges.append({"name": "Re-Entry Needed", "detail": f"No check-in for {days_since_checkin} days. A 25-minute session restarts momentum.", "tone": "warning"})
+    if silent_start and plan_age >= 7:
+        delay_badges.append({"name": "Still at the Start", "detail": "The plan has not moved yet. Complete one task to break the freeze.", "tone": "danger"})
+    badges.extend(delay_badges)
+
+    next_badge = None
+    for name, detail, earned, value, target in badge_specs:
+        if not earned:
+            next_badge = {
+                "name": name,
+                "detail": detail,
+                "value": value,
+                "target": target,
+                "progress": round(min(value / target, 1.0) * 100) if target else 0,
+            }
+            break
+
+    next_title = next_task.title if next_task else None
+    if title == "Momentum at Risk":
+        message = f"Some tasks slipped, but this is recoverable. Clear one small step{f' — {next_title}' if next_title else ''} to take the pressure down."
+    elif tone == "warning":
+        message = f"You are still in motion. A short focus block{f' on {next_title}' if next_title else ''} puts the plan back under control."
+    elif total and done >= total:
+        message = "Every task in this plan is complete. Capture the proof, update your resume, and celebrate the win."
+    elif streak >= 3:
+        message = f"You are on a {streak}-day streak. {next_title + ' is' if next_title else 'The next task is'} the next win waiting for you."
+    elif done > 0:
+        message = f"Progress is real: {done} of {total} tasks done. Keep the next step small and finish it today."
+    elif total:
+        message = f"One finished task changes how this plan feels. Start with {next_title or 'the first task'} today."
+    else:
+        message = "This plan is ready. Open it and choose your first step."
+
+    return {
+        "title": title,
+        "tone": tone,
+        "score": score,
+        "message": message,
+        "done": done,
+        "total": total,
+        "overdue": overdue,
+        "streak": streak,
+        "badges": badges,
+        "next_badge": next_badge,
+        "days_since_checkin": days_since_checkin,
+    }
+
+
 def _parse_checkin_signals(note):
     if not note:
         return {}
@@ -1555,7 +2486,7 @@ def _parse_checkin_signals(note):
 
 
 def _build_weekly_change_summary(roadmap, tasks, tests):
-    week_start = _utc_now() - timedelta(days=7)
+    week_start = _utc_now().replace(tzinfo=None) - timedelta(days=7)
     completed = [task for task in tasks if task.completed_at and task.completed_at >= week_start]
     checkins = []
     if _has_table("checkin"):
@@ -1571,7 +2502,7 @@ def _build_weekly_change_summary(roadmap, tasks, tests):
 
 
 def _build_monthly_review(roadmap, tasks, tests):
-    period_start = _utc_now() - timedelta(days=30)
+    period_start = _utc_now().replace(tzinfo=None) - timedelta(days=30)
     completed = [task for task in tasks if task.completed_at and task.completed_at >= period_start]
     active = [task for task in tasks if task.status == "doing"]
     overdue = [task for task in tasks if task.status != "done" and task.due_date and task.due_date < _utc_today()]
@@ -1657,15 +2588,24 @@ def _build_career_outcomes(roadmap, tasks):
     if roadmap.roadmap_type != "career":
         return None
     project_tasks = [task for task in tasks if task.title.startswith("Project:")]
+    assignment_tasks = [task for task in tasks if task.title.startswith("Assignment:")]
     proof_tasks = [task for task in tasks if any(marker in _normalize(task.title) for marker in ["portfolio", "resume", "interview", "proof", "job-ready", "case study"])]
     completed_projects = len([task for task in project_tasks if task.status == "done"])
+    completed_assignments = len([task for task in assignment_tasks if task.status == "done"])
     completed_proof = len([task for task in proof_tasks if task.status == "done"])
     portfolio_meter = round((completed_projects / max(len(project_tasks), 1)) * 100) if project_tasks else 0
-    readiness = round(((completed_projects * 0.5) + (completed_proof * 0.5)) / max(len(project_tasks) + len(proof_tasks), 1) * 100)
+    readiness = round(((completed_projects * 0.4) + (completed_assignments * 0.2) + (completed_proof * 0.4)) / max(len(project_tasks) + len(assignment_tasks) + len(proof_tasks), 1) * 100)
+    family_label = _extract_metadata_value(roadmap.source_text, "Career Family", "Professional path")
+    toolkit = [item.strip() for item in _extract_metadata_value(roadmap.source_text, "Career Toolkit", "").split(",") if item.strip()]
+    outcome = _extract_metadata_value(roadmap.source_text, "Career Outcome", "")
     return {
+        "family_label": family_label,
+        "toolkit": toolkit,
+        "outcome": outcome,
         "portfolio_meter": portfolio_meter,
         "job_readiness": readiness,
         "project_submission": [task for task in project_tasks[:4]],
+        "assignment_submission": [task for task in assignment_tasks[:6]],
         "proof_artifacts": [task for task in proof_tasks[:4]],
         "interview_flow": [
             "Complete one project and capture the challenge, solution, and result.",
@@ -1905,142 +2845,76 @@ def _generate_contextual_questions(topic_context, amount, roadmap_type="syllabus
     return question_bank[:amount]
 
 
-def _clean_fact_sentence(text):
-    if not text:
-        return ""
-    sentence = re.sub(r"\s+", " ", text).strip()
-    sentence = sentence.replace("\n", " ")
-    return sentence[:220]
-
-
-def _fetch_wikipedia_topic_facts(topic, limit=2):
-    query = (topic or "").strip()
-    if not query:
-        return []
-    facts = []
-    search_data = _safe_get(
-        "https://en.wikipedia.org/w/api.php",
-        params={
-            "action": "opensearch",
-            "search": query,
-            "limit": limit,
-            "namespace": 0,
-            "format": "json",
-        },
-    )
-    if not search_data or not isinstance(search_data, list) or len(search_data) < 4:
-        return []
-    titles = search_data[1] or []
-    urls = search_data[3] or []
-    for idx, title in enumerate(titles[:limit]):
-        summary = _safe_get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(str(title), safe='')}")
-        extract = ""
-        if isinstance(summary, dict):
-            extract = summary.get("extract") or ""
-        fact = _clean_fact_sentence(extract)
-        if not fact:
-            continue
-        facts.append(
-            {
-                "topic": query,
-                "title": str(title),
-                "fact": fact,
-                "url": urls[idx] if idx < len(urls) else "",
-            }
-        )
-    return facts
-
-
-def _build_web_context_questions(topic_context, amount, roadmap_type="syllabus"):
-    questions = []
-    if not topic_context:
-        return questions
-    gathered_facts = []
-    for item in topic_context[:6]:
-        gathered_facts.extend(_fetch_wikipedia_topic_facts(item.get("topic"), limit=2))
-        if len(gathered_facts) >= max(4, amount):
-            break
-    if not gathered_facts:
-        return questions
-
-    random.shuffle(gathered_facts)
-    fact_pool = [item["fact"] for item in gathered_facts if item.get("fact")]
-    for item in gathered_facts:
-        if len(questions) >= amount:
-            break
-        topic = item["topic"]
-        timeline_hint = next((ctx.get("timeline_hint") for ctx in topic_context if ctx.get("topic") == topic), "This week")
-        correct = item["fact"]
-        wrong_options = [fact for fact in fact_pool if fact != correct]
-        random.shuffle(wrong_options)
-        distractors = wrong_options[:2]
-        if roadmap_type == "upsc":
-            distractors.append("This topic has no link to prelims, mains, or revision strategy.")
-        elif roadmap_type == "career":
-            distractors.append("This topic should be skipped until all tutorials are complete.")
-        else:
-            distractors.append("This topic should only be revised in the final week.")
-        options = [correct] + distractors[:3]
-        random.shuffle(options)
-        questions.append(
-            {
-                "question": f"{topic} ({timeline_hint}): which statement is supported by a free web reference?",
-                "options": options,
-                "answer": correct,
-                "category": topic,
-                "source": "Wikipedia free API",
-            }
-        )
-    return questions[:amount]
-
-
-def _build_assessment_questions(roadmap, tasks, amount=10, difficulty="medium", mode="standard"):
-    focus_topic_context = _build_weekly_focus_topics(tasks)
-    focus_topics = [item["topic"] for item in focus_topic_context]
-    contextual = _generate_contextual_questions(
-        focus_topic_context or [{"topic": _base_task_topic(task.title), "timeline_hint": "This week", "is_revision": False} for task in tasks[:5] if _base_task_topic(task.title)],
-        amount,
-        roadmap.roadmap_type,
-    )
+def _focus_topic_context(roadmap, tasks, mode):
     if mode == "weekly":
-        web_context = _build_web_context_questions(
-            focus_topic_context or [{"topic": "Core review", "timeline_hint": "This week", "is_revision": True}],
-            max(3, amount // 2),
+        weekly = _build_weekly_focus_topics(tasks)
+        if weekly:
+            return weekly
+    return [
+        {"topic": _base_task_topic(task.title), "timeline_hint": "This week", "is_revision": False}
+        for task in tasks
+        if _base_task_topic(task.title)
+    ]
+
+
+def _build_assessment_questions(roadmap, tasks, amount=10, difficulty="medium", mode="standard",
+                                focus_topics=None):
+    context = _focus_topic_context(roadmap, tasks, mode)
+    if focus_topics:
+        context = [
+            {"topic": topic, "timeline_hint": "Weak area", "is_revision": True}
+            for topic in focus_topics
+        ]
+    topics = [item["topic"] for item in context][:8]
+
+    if roadmap.roadmap_type != "upsc":
+        contextual = _generate_contextual_questions(
+            context or [{"topic": "Core review", "timeline_hint": "This week", "is_revision": False}],
+            amount,
             roadmap.roadmap_type,
         )
-        external = _fetch_opentdb_questions(amount=max(3, amount // 2), difficulty=difficulty)
-        combined = contextual[: max(amount // 2, 3)] + web_context + external
-        while len(combined) < amount:
-            combined.extend(
-                _generate_contextual_questions(
-                    focus_topic_context or [{"topic": "Core review", "timeline_hint": "This week", "is_revision": True}],
-                    amount - len(combined),
-                    roadmap.roadmap_type,
-                )
-            )
-        return combined[:amount], focus_topics
-    external = _fetch_opentdb_questions(amount=amount, difficulty=difficulty)
-    if external:
-        return external[:amount], focus_topics
-    web_context = _build_web_context_questions(
-        focus_topic_context or [{"topic": "Core review", "timeline_hint": "This week", "is_revision": True}],
-        max(3, amount // 2),
-        roadmap.roadmap_type,
+        return contextual[:amount], topics
+
+    stats = ensure_pyq_synced()
+    if stats["prelims_total"] < 1:
+        return [], topics
+
+    subjects = subject_keywords_for_topics([item["topic"] for item in context])
+    subject_focus = subjects or ["All verified UPSC prelims subjects"]
+    if mode == "mock":
+        subjects = None
+    questions = prelims_questions(
+        amount=amount,
+        subjects=subjects,
+        topics=focus_topics,
+        exclude_texts=[],
+        spread_years=(mode == "mock"),
+        include_unverified=(mode == "open"),
+        archive_only=(mode == "open"),
     )
-    return (contextual + web_context)[:amount], focus_topics
+    for item in questions:
+        letter = item.get("correct", "")
+        item["answer"] = item["options"]["abcd".index(letter)] if letter in "abcd" and len(item["options"]) == 4 else ""
+        item["category"] = f"{item.get('subject', 'General Studies')} · {item.get('year', '')}".strip(" ·")
+        item["source"] = item.get("source") or "UPSC previous-year paper"
+    return questions, subject_focus
 
 
 def _persist_quiz_questions(roadmap, questions, difficulty, mode):
-    if not _has_quiz_question_schema():
-        return questions
     persisted = []
     for item in questions:
+        options = item.get("options") or []
+        correct = str(item.get("correct") or "").strip().lower()
+        if correct not in {"a", "b", "c", "d"}:
+            answer_text = (item.get("answer") or "").strip()
+            correct = "abcd"[options.index(answer_text)] if answer_text in options else "a"
         row = QuizQuestion(
             question_text=(item.get("question") or "").strip(),
-            options_json=json.dumps(item.get("options") or []),
-            correct_answer=(item.get("answer") or "").strip(),
+            options_json=json.dumps(options),
+            correct_answer=correct,
             category=(item.get("category") or "")[:180] or None,
-            source=(item.get("source") or "generated")[:80],
+            source=(item.get("source") or "")[:80] or None,
+            source_url=(item.get("source_url") or "")[:600] or None,
             difficulty=difficulty,
             mode=mode,
             user_id=session["user_id"],
@@ -2052,18 +2926,30 @@ def _persist_quiz_questions(roadmap, questions, difficulty, mode):
             {
                 "id": row.id,
                 "question": row.question_text,
-                "options": json.loads(row.options_json),
+                "options": options,
                 "category": row.category,
                 "source": row.source,
+                "source_url": row.source_url,
+                "year": item.get("year"),
             }
         )
-    # Keep the table lean for each user/roadmap pair.
-    stale = QuizQuestion.query.filter(
+
+    protected = set()
+    if _has_quiz_question_attempt_schema():
+        protected = {
+            row.question_id
+            for row in QuizQuestionAttempt.query.join(
+                QuizResult, QuizResult.id == QuizQuestionAttempt.quiz_result_id
+            ).filter(QuizResult.user_id == session["user_id"]).limit(2000).all()
+        }
+    stale_query = QuizQuestion.query.filter(
         QuizQuestion.user_id == session["user_id"],
         QuizQuestion.roadmap_id == roadmap.id,
         QuizQuestion.id.not_in([item["id"] for item in persisted]),
-    ).order_by(QuizQuestion.created_at.asc()).limit(300).all()
-    for row in stale:
+    )
+    if protected:
+        stale_query = stale_query.filter(QuizQuestion.id.not_in(protected))
+    for row in stale_query.order_by(QuizQuestion.created_at.asc()).limit(500).all():
         db.session.delete(row)
     db.session.commit()
     return persisted
@@ -2679,7 +3565,9 @@ def _build_readiness_metrics(roadmap, tasks, tests, done_map=None, attempts=None
     return [{"label": "Plan readiness", "value": overall, "hint": "Built from task completion, tests, and progress quality."}]
 
 
-def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week, pace_mode="steady", source_text=""):
+def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week,
+                 study_days_per_week, pace_mode="steady", source_text="", plan_days=None,
+                 hours_per_day=None, assignments=None):
     profile = _extract_profile_from_source_text(source_text)
     workflow_mode = _normalize(profile.get("workflow_mode", "normal"))
     weak_areas = [item.strip() for item in profile.get("weak_areas", "").split(",") if item.strip()]
@@ -2700,6 +3588,10 @@ def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hou
         all_items.append("High-yield revision drill")
         all_items.append("Time-boxed self-test and review")
 
+    if roadmap_type == "career":
+        for assignment in assignments or []:
+            all_items.append(f"Assignment: {assignment}")
+
     if roadmap_type in {"career", "upsc"}:
         for project in projects:
             all_items.append(f"Project: {project}")
@@ -2718,7 +3610,168 @@ def _build_tasks(roadmap_type, topics, projects, start_date, timeline_weeks, hou
             "Issue-based current affairs mapping",
         ])
 
-    return _schedule_items(all_items, start_date, timeline_weeks, hours_per_week, study_days_per_week, pace_mode)
+    return _schedule_items(
+        all_items, start_date, timeline_weeks, hours_per_week, study_days_per_week,
+        pace_mode, plan_days=plan_days, hours_per_day=hours_per_day,
+    )
+
+
+_NON_TOPIC_TASK_PREFIXES = ("Project: ", "Assignment: ", "Revision Sprint: ", "Weak-area recovery: ")
+_NON_TOPIC_TASK_TITLES = {
+    "portfolio readiness review", "resume bullet drafting", "interview question bank",
+    "job-ready proof artifact", "answer writing review framework",
+    "revision calendar before mocks", "issue-based current affairs mapping",
+    "high-yield revision drill", "time-boxed self-test and review",
+}
+
+
+def _topic_key(text):
+    return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
+
+
+def _clean_topic_list(items):
+    cleaned = []
+    seen = set()
+    for item in items or []:
+        text = re.sub(r"\s+", " ", str(item or "")).strip(" ,;:-–—")
+        if not text or len(text) < 3 or len(text) > 140:
+            continue
+        if not re.search(r"[A-Za-z]", text):
+            continue
+        key = _topic_key(text)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(text)
+        if len(cleaned) >= 80:
+            break
+    return cleaned
+
+
+def _roadmap_topics(roadmap, tasks):
+    stored = _extract_metadata_value(roadmap.source_text, "Plan Topics", "")
+    if stored:
+        try:
+            parsed = json.loads(stored)
+        except (TypeError, ValueError):
+            parsed = None
+        if isinstance(parsed, list):
+            topics = _clean_topic_list([str(item) for item in parsed])
+            if topics:
+                return topics
+
+    topics = []
+    for task in tasks:
+        title = (task.title or "").strip()
+        if any(title.startswith(prefix) for prefix in _NON_TOPIC_TASK_PREFIXES):
+            continue
+        if title.lower() in _NON_TOPIC_TASK_TITLES:
+            continue
+        topics.append(title)
+    return _clean_topic_list(topics)
+
+
+def _rebuild_unfinished_tasks(roadmap, topics, tasks):
+    """Rebuild unfinished work around edited topics without touching history."""
+    done_tasks = [task for task in tasks if task.status == "done"]
+    unfinished = [task for task in tasks if task.status != "done"]
+    done_keys = {_topic_key(task.title) for task in done_tasks}
+
+    projects = []
+    assignments = []
+    for task in tasks:
+        title = task.title or ""
+        if title.startswith("Project: "):
+            projects.append(title[len("Project: "):])
+        elif title.startswith("Assignment: "):
+            assignments.append(title[len("Assignment: "):])
+    projects = _dedupe_items(projects)
+    assignments = _dedupe_items(assignments)
+
+    for task in unfinished:
+        db.session.delete(task)
+
+    today = _utc_today()
+    remaining_days = max((roadmap.target_date - today).days + 1, 7)
+    specs, _, computed_end = _build_tasks(
+        roadmap.roadmap_type,
+        topics,
+        projects,
+        today,
+        0,
+        roadmap.hours_per_week or 6,
+        roadmap.study_days_per_week or 5,
+        _extract_pace_mode_from_source_text(roadmap.source_text),
+        roadmap.source_text,
+        plan_days=remaining_days,
+        hours_per_day=roadmap.hours_per_day or 2,
+        assignments=assignments,
+    )
+
+    for index, task in enumerate(done_tasks, start=1):
+        task.order_index = index
+
+    optional_subject = _extract_metadata_value(roadmap.source_text, "Optional Subject", "")
+    created = []
+    seen = set(done_keys)
+    order = len(done_tasks)
+    for spec in specs:
+        key = _topic_key(spec["title"])
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        order += 1
+        task = Task(
+            title=spec["title"],
+            order_index=order,
+            due_date=spec["due_date"],
+            difficulty=spec["difficulty"],
+            estimated_hours=spec["estimated_hours"],
+            roadmap_id=roadmap.id,
+        )
+        if roadmap.roadmap_type == "upsc":
+            for resource in _upsc_resources_for_task(task.title, optional_subject):
+                task.resources.append(Resource(
+                    provider=resource["provider"],
+                    title=resource["title"],
+                    url=resource["url"],
+                    summary=resource.get("use_case", "Curated UPSC resource"),
+                    score=0.95,
+                ))
+        db.session.add(task)
+        created.append(task)
+
+    completed_hours = sum(
+        task.actual_hours if task.actual_hours and task.actual_hours > 0 else (task.estimated_hours or 0.0)
+        for task in done_tasks
+    )
+    remaining_hours = sum(task.estimated_hours or 0.0 for task in created)
+    roadmap.completed_tasks = len(done_tasks)
+    roadmap.total_tasks = len(done_tasks) + len(created)
+    roadmap.total_hours_est = round(completed_hours + remaining_hours, 1)
+    if created:
+        roadmap.target_date = max((task.due_date for task in created if task.due_date), default=computed_end)
+    elif done_tasks:
+        roadmap.target_date = max(
+            (task.completed_at.date() for task in done_tasks if task.completed_at),
+            default=today,
+        )
+    else:
+        roadmap.target_date = computed_end
+    roadmap.plan_days = max((roadmap.target_date - roadmap.start_date).days + 1, 1)
+    roadmap.source_text = _replace_metadata_line(
+        roadmap.source_text, "Plan Topics", json.dumps(topics, ensure_ascii=False)
+    )
+    db.session.commit()
+    return len(created), len(unfinished)
+
+
+def _background_sync_pyq(app):
+    with app.app_context():
+        try:
+            ensure_pyq_synced()
+        except Exception:
+            current_app.logger.exception("Background PYQ sync failed")
 
 
 def _background_fetch_resources(app, roadmap_id):
@@ -2733,10 +3786,20 @@ def _background_fetch_resources(app, roadmap_id):
             roadmap.resource_fetch_started_at = _utc_now().replace(tzinfo=None)
             db.session.commit()
             tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
-            for task in tasks:
-                if task.resources:
+            pending = [
+                (task.id, task.title.replace("Project: ", ""))
+                for task in tasks
+                if not task.resources
+            ]
+            # Release the read transaction before the slow network calls. On
+            # SQLite an open read transaction blocks writers, including quiz
+            # generation in another request.
+            db.session.remove()
+            for task_id, title in pending:
+                resources = _fetch_resources_for_topic(title)
+                task = db.session.get(Task, task_id)
+                if task is None:
                     continue
-                resources = _fetch_resources_for_topic(task.title.replace("Project: ", ""))
                 for res in resources:
                     db.session.add(Resource(
                         provider=res["provider"],
@@ -2744,15 +3807,25 @@ def _background_fetch_resources(app, roadmap_id):
                         url=res["url"],
                         summary=res.get("summary", ""),
                         score=res.get("score", 0.0),
+                        last_checked_at=_utc_now().replace(tzinfo=None),
                         task_id=task.id
                     ))
                 task.last_resource_refresh = _utc_now().replace(tzinfo=None)
-            roadmap.resource_fetch_status = "done"
-            roadmap.resource_fetch_completed_at = _utc_now().replace(tzinfo=None)
-            db.session.commit()
+                db.session.commit()
+            roadmap = db.session.get(Roadmap, roadmap_id)
+            if roadmap is not None:
+                roadmap.resource_fetch_status = "done"
+                roadmap.resource_fetch_completed_at = _utc_now().replace(tzinfo=None)
+                db.session.commit()
         except Exception:
-            roadmap.resource_fetch_status = "failed"
-            db.session.commit()
+            db.session.rollback()
+            try:
+                roadmap = db.session.get(Roadmap, roadmap_id)
+                if roadmap is not None:
+                    roadmap.resource_fetch_status = "failed"
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
         finally:
             db.session.remove()
 
@@ -2767,6 +3840,59 @@ def _calculate_forecast(roadmap):
     remaining = roadmap.total_tasks - roadmap.completed_tasks
     est_days_left = math.ceil(remaining / pace)
     return _utc_today() + timedelta(days=est_days_left)
+
+
+def _build_plan_summary(roadmap, tasks):
+    study_days_per_week = _safe_int(roadmap.study_days_per_week, 5, 1, 7)
+    hours_per_day = _safe_float(
+        roadmap.hours_per_day or (roadmap.hours_per_week or 6) / study_days_per_week,
+        2, 0.5, 16,
+    )
+    requested_days = _safe_int(roadmap.plan_days, 0, 0, 3650)
+    actual_days = max((roadmap.target_date - roadmap.start_date).days + 1, 1)
+    dates = _study_dates(roadmap.start_date, actual_days, study_days_per_week)
+    capacity = round(len(dates) * hours_per_day, 1)
+    scheduled = round(sum(task.estimated_hours or 0 for task in tasks), 1)
+    remaining = round(sum(task.estimated_hours or 0 for task in tasks if task.status != "done"), 1)
+    completed_hours = round(scheduled - remaining, 1)
+    utilization = scheduled / capacity if capacity else 0
+    daily_average = scheduled / len(dates) if dates else 0
+    buffer_hours = round(capacity - scheduled, 1)
+
+    if utilization > 1.05:
+        status, tone = "Overloaded", "danger"
+        message = "The requested window is too short. The plan was extended; add days or hours per day for breathing room."
+    elif utilization > 0.85:
+        status, tone = "Tight", "warn"
+        message = "This is workable but leaves little slack. Protect the study days and keep rest days free."
+    elif utilization < 0.5:
+        status, tone = "Light", "good"
+        message = "There is spare capacity. Use it for PYQs, mock analysis, and revision instead of adding new topics."
+    else:
+        status, tone = "Balanced", "good"
+        message = "The workload fits your available study time with a sensible buffer."
+
+    coverage = round((completed_hours / scheduled) * 100, 1) if scheduled else 0
+    return {
+        "requested_days": requested_days or actual_days,
+        "actual_days": actual_days,
+        "study_days": len(dates),
+        "study_days_per_week": study_days_per_week,
+        "hours_per_day": hours_per_day,
+        "hours_per_week": round(hours_per_day * study_days_per_week, 1),
+        "capacity_hours": capacity,
+        "scheduled_hours": scheduled,
+        "remaining_hours": remaining,
+        "completed_hours": completed_hours,
+        "buffer_hours": buffer_hours,
+        "daily_average": round(daily_average, 1),
+        "utilization": round(utilization * 100, 1),
+        "coverage": coverage,
+        "status": status,
+        "tone": tone,
+        "message": message,
+        "finish_date": roadmap.target_date,
+    }
 
 
 def _update_streak(roadmap, checkin_date):
@@ -2815,11 +3941,24 @@ def dashboard():
     if active_roadmap:
         active_next = Task.query.filter_by(roadmap_id=active_roadmap.id).filter(Task.status != "done").order_by(Task.order_index.asc()).first()
     dashboard_insights = _build_dashboard_insights(roadmaps)
-    return render_template('dashboard.html', user=user, roadmaps=roadmaps, active_roadmap=active_roadmap, active_next=active_next, recent_improvements=RECENT_IMPROVEMENTS, dashboard_insights=dashboard_insights)
+    momentum = _build_momentum_status(roadmaps, next_task=active_next)
+    return render_template('dashboard.html', user=user, roadmaps=roadmaps, active_roadmap=active_roadmap, active_next=active_next, recent_improvements=RECENT_IMPROVEMENTS, dashboard_insights=dashboard_insights, momentum=momentum)
+
+
+@dashboard_bp.route('/roadmap/parse-nl', methods=['POST'])
+@login_required
+@rate_limit(60, 600, scope="roadmap.parse_nl")
+def parse_nl_plan():
+    payload = request.get_json(silent=True) or request.form
+    text = (payload.get('nl_input') or payload.get('text') or '').strip()
+    if not text:
+        return jsonify({"error": "Describe your plan first.", "understood": False}), 400
+    return jsonify(parse_plan_text(text[:3000]))
 
 
 @dashboard_bp.route('/roadmap/new', methods=['GET', 'POST'])
 @login_required
+@rate_limit(20, 600, scope="roadmap.create")
 def create_roadmap():
     if request.method == 'POST':
         try:
@@ -2834,15 +3973,53 @@ def create_roadmap():
             target_outcome = request.form.get('target_outcome', '').strip()
             if roadmap_type not in {"syllabus", "career"}:
                 roadmap_type = "syllabus"
-            timeline_weeks = _safe_int(request.form.get('timeline_weeks', 0) or 0, 0, 0, 52)
-            hours_per_week = _safe_int(request.form.get('hours_per_week', 6) or 6, 6, 1, 40)
+            plan_days = _safe_int(request.form.get('plan_days', request.form.get('total_days', 0)) or 0, 0, 0, 730)
+            timeline_weeks = _safe_int(request.form.get('timeline_weeks', 0) or 0, 0, 0, 104)
             study_days_per_week = _safe_int(request.form.get('study_days_per_week', 5) or 5, 5, 1, 7)
+
+            nl_input = request.form.get('nl_input', '').strip()
+            nl_plan = parse_plan_text(nl_input) if nl_input else {}
+            if nl_plan.get('understood'):
+                if (
+                    nl_plan.get('roadmap_type') == 'career'
+                    and roadmap_type == 'syllabus'
+                    and request.form.get('nl_type_touched') != '1'
+                ):
+                    roadmap_type = 'career'
+                if not title:
+                    title = nl_plan.get('title', '')
+                if plan_days == 0 and nl_plan.get('plan_days'):
+                    plan_days = nl_plan['plan_days']
+                if timeline_weeks == 0 and nl_plan.get('timeline_weeks'):
+                    timeline_weeks = nl_plan['timeline_weeks']
+                if nl_plan.get('study_days_per_week') and request.form.get('study_days_per_week') in (None, '', '5'):
+                    study_days_per_week = nl_plan['study_days_per_week']
+                if nl_plan.get('current_level') and current_level == 'beginner':
+                    current_level = nl_plan['current_level']
+                if nl_plan.get('pace_mode') and pace_mode == 'steady':
+                    pace_mode = nl_plan['pace_mode']
+                if not target_outcome:
+                    target_outcome = nl_plan.get('target_outcome', '')
+                if not weak_areas_input:
+                    weak_areas_input = nl_plan.get('weak_areas', '')
+
+            hours_per_day_raw = request.form.get('hours_per_day')
+            if hours_per_day_raw in (None, '', '2') and nl_plan.get('hours_per_day'):
+                hours_per_day_raw = str(nl_plan['hours_per_day'])
+            if hours_per_day_raw not in (None, ''):
+                hours_per_day = _safe_float(hours_per_day_raw, 2, 0.5, 16)
+                hours_per_week = max(1, round(hours_per_day * study_days_per_week))
+            else:
+                hours_per_week = _safe_int(request.form.get('hours_per_week', 6) or 6, 6, 1, 80)
+                hours_per_day = _safe_float(hours_per_week / study_days_per_week, 2, 0.5, 16)
             start_date = _safe_date(request.form.get('start_date'))
 
             raw_text = request.form.get('source_text', '').strip()
+            source_text_input = raw_text
             confirmed_topics = request.form.get('confirmed_topics', '').strip()
             uploaded = request.files.get('syllabus_file')
-            if uploaded and uploaded.filename:
+            has_upload = bool(uploaded and uploaded.filename)
+            if has_upload:
                 if not _allowed_file(uploaded.filename, {"pdf", "txt", "docx", "png", "jpg", "jpeg", "bmp", "tiff"}):
                     flash("Unsupported file type. Upload PDF, TXT, DOCX, or image files.")
                     return redirect(url_for('dashboard.create_roadmap'))
@@ -2864,47 +4041,44 @@ def create_roadmap():
                     except Exception:
                         pass
 
+            use_nl_topics = bool(nl_plan.get('understood') and nl_plan.get('topics')) and not source_text_input and not has_upload
+            if use_nl_topics and not raw_text:
+                raw_text = "\n".join(nl_plan['topics'])
+
             topics = []
             projects = []
-            use_ai = request.form.get('use_ai') == 'on'
-            if confirmed_topics:
-                topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
-            elif roadmap_type == "career":
-                key = _normalize(title)
-                match = None
-                for template_key in CAREER_TEMPLATES.keys():
-                    if template_key in key:
-                        match = CAREER_TEMPLATES[template_key]
-                        break
-                if "upsc" in key:
-                    topics = UPSC_TEMPLATE_TOPICS
-                    projects = [
-                        "PYQ drill: last 10 years (set weekly targets)",
-                        "Mock test sprint every 2 weeks",
-                        "Optional subject deep dive"
-                    ]
-                    _ensure_upsc_question_bank()
+            assignments = []
+            extraction_stats = {"raw_lines": 0, "noise_lines": 0, "topics": 0}
+            if roadmap_type == "career":
+                career_plan = _build_career_plan(title, raw_text, current_level, target_outcome)
+                if confirmed_topics:
+                    topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
+                elif use_nl_topics:
+                    topics = _clean_topic_list(nl_plan['topics'])
+                    extraction_stats = {
+                        "raw_lines": len(nl_plan['topics']),
+                        "noise_lines": 0,
+                        "topics": len(topics),
+                    }
                 else:
-                    esco_topics = _fetch_career_template_esco(title)
-                    if esco_topics:
-                        topics = esco_topics
-                        projects = [
-                            f"Build a {title} portfolio",
-                            f"{title} case study with real data",
-                            f"Showcase project: {title} mini product"
-                        ]
-                    elif match:
-                        topics = match["topics"]
-                        projects = match["projects"]
-                    else:
-                        topics = _extract_topics_from_text(raw_text)
+                    topics = career_plan["topics"]
+                projects = career_plan["projects"]
+                assignments = career_plan["assignments"]
+                title = title or career_plan["role"]
+                raw_text = _append_metadata_line(raw_text, "Career Family", career_plan["family_label"])
+                raw_text = _append_metadata_line(raw_text, "Career Toolkit", ", ".join(career_plan["tools"]))
+                raw_text = _append_metadata_line(raw_text, "Career Outcome", career_plan["outcome"])
+            elif confirmed_topics:
+                topics = [t.strip() for t in confirmed_topics.splitlines() if t.strip()]
+            elif use_nl_topics:
+                topics = _clean_topic_list(nl_plan['topics'])
+                extraction_stats = {
+                    "raw_lines": len(nl_plan['topics']),
+                    "noise_lines": 0,
+                    "topics": len(topics),
+                }
             else:
-                topics = _extract_topics_from_text(raw_text)
-
-            if roadmap_type != "upsc" and (use_ai or current_app.config.get("AI_TOPIC_EXTRACTION_ENABLED")) and raw_text and not confirmed_topics:
-                ai_topics = _ai_extract_topics(raw_text)
-                if ai_topics:
-                    topics = ai_topics
+                topics, extraction_stats = _extract_topics_with_stats(raw_text)
 
             if roadmap_type == "syllabus" and not confirmed_topics:
                 if not topics:
@@ -2915,7 +4089,9 @@ def create_roadmap():
                     title=title,
                     roadmap_type=roadmap_type,
                     timeline_weeks=timeline_weeks,
+                    plan_days=plan_days,
                     hours_per_week=hours_per_week,
+                    hours_per_day=hours_per_day,
                     study_days_per_week=study_days_per_week,
                     pace_mode=pace_mode,
                     current_level=current_level,
@@ -2927,7 +4103,11 @@ def create_roadmap():
                     start_date=start_date,
                     raw_text=raw_text,
                     topics="\n".join(topics),
-                    original_topics=topics
+                    original_topics=topics,
+                    filtered_count=extraction_stats["noise_lines"],
+                    raw_line_count=extraction_stats["raw_lines"],
+                    nl_summary=nl_plan.get('summary', []) if nl_plan.get('understood') else [],
+                    nl_notes=nl_plan.get('notes', []) if nl_plan.get('understood') else [],
                 )
 
             if not title:
@@ -2945,7 +4125,8 @@ def create_roadmap():
             raw_text = _append_metadata_line(raw_text, "Target Outcome", target_outcome)
             roadmap, task_ids, auto_fetch, _ = _persist_roadmap(
                 roadmap_type, title, raw_text, topics, projects, start_date, timeline_weeks,
-                hours_per_week, study_days_per_week, pace_mode=pace_mode
+                hours_per_week, study_days_per_week, pace_mode=pace_mode,
+                plan_days=plan_days, hours_per_day=hours_per_day, assignments=assignments,
             )
             if auto_fetch:
                 thread = threading.Thread(
@@ -2965,8 +4146,57 @@ def create_roadmap():
     return render_template('roadmap_new.html')
 
 
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/topics', methods=['GET', 'POST'])
+@login_required
+@rate_limit(30, 600, scope="roadmap.topics")
+def edit_topics(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+    current_topics = _roadmap_topics(roadmap, tasks)
+
+    if request.method == 'POST':
+        topics = _clean_topic_list(request.form.get('confirmed_topics', '').splitlines())
+        if not topics:
+            flash("Keep at least one topic before saving.")
+            return redirect(url_for('dashboard.edit_topics', roadmap_id=roadmap.id))
+        if topics == current_topics:
+            flash("No topic changes to save.")
+            return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+        try:
+            added, removed = _rebuild_unfinished_tasks(roadmap, topics, tasks)
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Failed to update roadmap topics")
+            flash("We couldn't update those topics right now. Please try again.")
+            return redirect(url_for('dashboard.edit_topics', roadmap_id=roadmap.id))
+        if roadmap.roadmap_type == "career" and current_app.config.get("ENABLE_EXTERNAL_RESOURCES", True):
+            thread = threading.Thread(
+                target=_background_fetch_resources,
+                args=(current_app._get_current_object(), roadmap.id),
+                daemon=True,
+            )
+            thread.start()
+        flash(
+            f"Topics updated: {added} task(s) scheduled and {removed} unfinished task(s) replaced. "
+            "Completed tasks were preserved."
+        )
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+
+    return render_template(
+        'roadmap_topics.html',
+        roadmap=roadmap,
+        topics="\n".join(current_topics),
+        original_topics=current_topics,
+        task_count=len(tasks),
+        done_count=len([task for task in tasks if task.status == "done"]),
+    )
+
+
 @dashboard_bp.route('/upsc/new', methods=['GET', 'POST'])
 @login_required
+@rate_limit(20, 600, scope="roadmap.create_upsc")
 def create_upsc_roadmap():
     if request.method == 'POST':
         try:
@@ -2978,9 +4208,16 @@ def create_upsc_roadmap():
             weak_areas_input = request.form.get('weak_areas', '').strip()
             workflow_mode = request.form.get('workflow_mode', 'exam').strip()
             target_outcome = request.form.get('target_outcome', 'Clear the next stage with confidence').strip()
-            timeline_weeks = _safe_int(request.form.get('timeline_weeks', 0) or 0, 0, 0, 52)
-            hours_per_week = _safe_int(request.form.get('hours_per_week', 6) or 6, 6, 1, 40)
-            study_days_per_week = _safe_int(request.form.get('study_days_per_week', 5) or 5, 5, 1, 7)
+            plan_days = _safe_int(request.form.get('plan_days', request.form.get('total_days', 0)) or 0, 0, 0, 730)
+            timeline_weeks = _safe_int(request.form.get('timeline_weeks', 0) or 0, 0, 0, 104)
+            study_days_per_week = _safe_int(request.form.get('study_days_per_week', 6) or 6, 6, 1, 7)
+            hours_per_day_raw = request.form.get('hours_per_day')
+            if hours_per_day_raw not in (None, ''):
+                hours_per_day = _safe_float(hours_per_day_raw, 3, 0.5, 16)
+                hours_per_week = max(1, round(hours_per_day * study_days_per_week))
+            else:
+                hours_per_week = _safe_int(request.form.get('hours_per_week', 20) or 20, 20, 1, 80)
+                hours_per_day = _safe_float(hours_per_week / study_days_per_week, 3, 0.5, 16)
             upsc_focus = request.form.get('upsc_focus', 'full_journey').strip() or "full_journey"
             if upsc_focus not in UPSC_DEFAULT_SUBJECTS_BY_FOCUS:
                 upsc_focus = "full_journey"
@@ -3012,7 +4249,6 @@ def create_upsc_roadmap():
                     return redirect(url_for('dashboard.create_upsc_roadmap'))
             else:
                 topics, projects, upsc_subjects = _build_upsc_subject_plan(upsc_subjects, upsc_optional_subject, upsc_focus)
-                _ensure_upsc_question_bank()
 
             if not confirmed_topics:
                 return render_template(
@@ -3020,7 +4256,9 @@ def create_upsc_roadmap():
                     title=title,
                     roadmap_type="upsc",
                     timeline_weeks=timeline_weeks,
+                    plan_days=plan_days,
                     hours_per_week=hours_per_week,
+                    hours_per_day=hours_per_day,
                     study_days_per_week=study_days_per_week,
                     pace_mode=pace_mode,
                     current_level=current_level,
@@ -3040,7 +4278,8 @@ def create_upsc_roadmap():
 
             roadmap, task_ids, auto_fetch, target_date = _persist_roadmap(
                 "upsc", title, raw_text, topics, projects, start_date, timeline_weeks,
-                hours_per_week, study_days_per_week, upsc_focus, upsc_optional_subject, pace_mode
+                hours_per_week, study_days_per_week, upsc_focus, upsc_optional_subject, pace_mode,
+                plan_days=plan_days, hours_per_day=hours_per_day,
             )
 
             if task_ids:
@@ -3069,6 +4308,12 @@ def create_upsc_roadmap():
                     flash("Roadmap created, but mock-test scheduling is unavailable until the database schema is updated.")
                 db.session.commit()
 
+            pyq_thread = threading.Thread(
+                target=_background_sync_pyq,
+                args=(current_app._get_current_object(),),
+                daemon=True
+            )
+            pyq_thread.start()
             if auto_fetch:
                 thread = threading.Thread(
                     target=_background_fetch_resources,
@@ -3144,8 +4389,16 @@ def view_roadmap(roadmap_id):
     resource_groups_map = {task.id: _build_resource_groups(annotated_resources_map.get(task.id, [])) for task in tasks}
     milestones = _build_milestones(roadmap, tasks, tests, done_map, attempts)
     readiness_metrics = _build_readiness_metrics(roadmap, tasks, tests, done_map, attempts, quiz_results)
+    plan_summary = _build_plan_summary(roadmap, tasks)
+    roadmap_pulse = _build_momentum_status(
+        [roadmap],
+        tasks=tasks,
+        next_task=next((item for item in tasks if item.status != "done"), None),
+    )
     return render_template(
         'roadmap_view.html',
+        plan_summary=plan_summary,
+        roadmap_pulse=roadmap_pulse,
         roadmap=roadmap,
         tasks=tasks,
         progress=progress,
@@ -3250,8 +4503,8 @@ def practice(roadmap_id):
     if not all(_has_table(name) for name in ["question", "question_attempt", "pyq_completion"]):
         flash("Practice Vault is temporarily unavailable until the database schema is updated.")
         return redirect(url_for('dashboard.dashboard'))
-    _ensure_upsc_question_bank()
-    questions = Question.query.filter_by(exam="UPSC").limit(60).all()
+    ensure_pyq_synced()
+    questions = mains_questions(amount=12)
     attempts = {a.question_id: a for a in QuestionAttempt.query.filter_by(user_id=session['user_id']).all()}
     current_year = _utc_now().year
     years = list(range(current_year - 9, current_year + 1))
@@ -3261,7 +4514,11 @@ def practice(roadmap_id):
         done_map.setdefault(c.exam, []).append(c.year)
     pyq_total = sum(len(items) for items in done_map.values())
     avg_score = round(sum(a.score for a in attempts.values()) / max(len(attempts), 1), 1) if attempts else 0.0
-    weak_areas = _build_weak_area_summary(questions, attempts)
+    weak_areas = _build_weak_area_summary(
+        Question.query.filter_by(stage="mains", is_public=True).limit(80).all(),
+        attempts,
+    )
+    coverage = coverage_stats()
     practice_coach = _build_practice_coach(pyq_total, avg_score, weak_areas)
     readiness_metrics = _build_readiness_metrics(
         roadmap,
@@ -3283,86 +4540,407 @@ def practice(roadmap_id):
         avg_score=avg_score,
         weak_areas=weak_areas,
         practice_coach=practice_coach,
-        readiness_metrics=readiness_metrics
+        readiness_metrics=readiness_metrics,
+        coverage=coverage,
+        is_admin=_is_admin(),
+        official_pyq_url=OFFICIAL_PYQ_URL,
+        official_answer_key_url=OFFICIAL_ANSWER_KEY_URL,
+        pyq_attribution=PYQ_ATTRIBUTION,
     )
+
+
+UPSC_MATERIALS_EXTRA = [
+    {
+        "title": "Economic Survey",
+        "url": "https://www.indiabudget.gov.in/economicsurvey/",
+        "provider": "official",
+        "bucket": "Deep study",
+        "tags": ["Economy", "Official", "Data"],
+        "use_case": "Use the latest survey for economy data, policy direction, and mains-ready examples.",
+        "topics": ["economy", "budget", "mains", "interview"],
+    },
+    {
+        "title": "Union Budget Documents",
+        "url": "https://www.indiabudget.gov.in",
+        "provider": "official",
+        "bucket": "Official source",
+        "tags": ["Economy", "Budget", "Official"],
+        "use_case": "Primary source for budget allocations, schemes, and fiscal policy examples.",
+        "topics": ["economy", "budget", "governance", "mains"],
+    },
+    {
+        "title": "Yojana Magazine",
+        "url": "https://yojana.gov.in",
+        "provider": "official",
+        "bucket": "Quick revision",
+        "tags": ["Current affairs", "Society", "Mains"],
+        "use_case": "Monthly theme-based reading for social issues, schemes, and essay material.",
+        "topics": ["society", "governance", "current affairs", "mains", "essay"],
+    },
+    {
+        "title": "Supreme Court of India Judgments",
+        "url": "https://main.sci.gov.in/judgments",
+        "provider": "official",
+        "bucket": "Deep study",
+        "tags": ["Polity", "Judiciary", "Official"],
+        "use_case": "Use landmark judgments for polity answers, constitutional morality, and governance debates.",
+        "topics": ["polity", "constitution", "governance", "mains"],
+    },
+    {
+        "title": "UPSC Model Question and Answer Booklets",
+        "url": "https://upsc.gov.in/examination/model-question-and-answer-booklets",
+        "provider": "upsc",
+        "bucket": "Official source",
+        "tags": ["Model answers", "Mains", "Answer writing"],
+        "use_case": "See the official answer structure, language, and depth expected in mains.",
+        "topics": ["mains", "answer writing", "ethics", "optional"],
+    },
+    {
+        "title": "UPSC Answer Keys",
+        "url": OFFICIAL_ANSWER_KEY_URL,
+        "provider": "upsc",
+        "bucket": "Official source",
+        "tags": ["PYQ", "Answer key", "Official"],
+        "use_case": "Verify every prelims PYQ answer against the official key before trusting a mock score.",
+        "topics": ["prelims", "pyq", "revision"],
+    },
+]
+
+MAINS_PAPER_SUBJECTS = {
+    "GS-I": {"History", "Geography"},
+    "GS-II": {"Polity", "International Relations"},
+    "GS-III": {"Economy", "Environment", "Science & Technology", "Current Affairs"},
+}
+
+
+def _upsc_mains_papers_for_roadmap(roadmap, tasks):
+    papers = []
+    source_text = roadmap.source_text or ""
+    for label in ("GS Paper I", "GS Paper II", "GS Paper III"):
+        if label.lower() in source_text.lower():
+            papers.append(label.replace("GS Paper ", "GS-").replace("I", "I"))
+    subjects = set(subject_keywords_for_topics([task.title for task in tasks]))
+    for paper, mapped in MAINS_PAPER_SUBJECTS.items():
+        if subjects & mapped and paper not in papers:
+            papers.append(paper)
+    return papers or ["GS-I", "GS-II", "GS-III"]
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/mains')
+@login_required
+def mains_practice(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    if roadmap.roadmap_type != "upsc":
+        flash("Mains practice is part of UPSC missions.")
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+    tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+    available_papers = _upsc_mains_papers_for_roadmap(roadmap, tasks)
+
+    selected_paper = request.args.get("paper", "").strip()
+    if selected_paper not in {"GS-I", "GS-II", "GS-III"}:
+        selected_paper = ""
+    ensure_pyq_synced()
+    questions = mains_questions(
+        amount=6,
+        papers=[selected_paper] if selected_paper else available_papers,
+    )
+    if not questions:
+        questions = mains_questions(amount=6)
+    attempts = {
+        a.question_id: a
+        for a in QuestionAttempt.query.filter_by(user_id=session['user_id']).all()
+    }
+    return render_template(
+        "mains.html",
+        roadmap=roadmap,
+        questions=questions,
+        attempts=attempts,
+        available_papers=available_papers,
+        selected_paper=selected_paper,
+        coverage=coverage_stats(),
+        official_pyq_url=OFFICIAL_PYQ_URL,
+        official_answer_key_url=OFFICIAL_ANSWER_KEY_URL,
+        pyq_attribution=PYQ_ATTRIBUTION,
+    )
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/interview')
+@login_required
+def interview_prep(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    if roadmap.roadmap_type != "upsc":
+        flash("Interview practice is part of UPSC missions.")
+        return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
+    profile = {
+        "optional_subject": _extract_metadata_value(roadmap.source_text, "Optional Subject", ""),
+        "weak_areas": _extract_metadata_value(roadmap.source_text, "Weak Areas", ""),
+        "target_outcome": _extract_metadata_value(roadmap.source_text, "Target Outcome", ""),
+    }
+    prompts = get_interview_set(profile, amount=8)
+    return render_template(
+        "interview.html",
+        roadmap=roadmap,
+        prompts=prompts,
+        profile=profile,
+        official_pyq_url=OFFICIAL_PYQ_URL,
+    )
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/materials')
+@login_required
+def materials(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
+
+    items = []
+    seen_urls = set()
+    if roadmap.roadmap_type == "upsc":
+        for resource in UPSC_CURATED_RESOURCES + UPSC_MATERIALS_EXTRA:
+            if resource["url"] in seen_urls:
+                continue
+            seen_urls.add(resource["url"])
+            items.append(dict(resource))
+
+    roadmap_items = []
+    for task in tasks:
+        for resource in sorted(task.resources, key=lambda r: -(r.score or 0))[:2]:
+            if not resource.url or resource.url in seen_urls:
+                continue
+            seen_urls.add(resource.url)
+            roadmap_items.append({
+                "title": resource.title,
+                "url": resource.url,
+                "provider": resource.provider,
+                "bucket": "From your roadmap",
+                "tags": [task.title[:40], "Task resource"],
+                "use_case": resource.summary or f"Added for: {task.title}",
+                "topics": [],
+            })
+
+    groups = {}
+    for item in items + roadmap_items:
+        groups.setdefault(item["bucket"], []).append(item)
+    return render_template(
+        "materials.html",
+        roadmap=roadmap,
+        groups=groups,
+        coverage=coverage_stats(),
+        is_admin=_is_admin(),
+        official_pyq_url=OFFICIAL_PYQ_URL,
+        official_answer_key_url=OFFICIAL_ANSWER_KEY_URL,
+        pyq_attribution=PYQ_ATTRIBUTION,
+    )
+
+
+@dashboard_bp.route('/roadmap/<int:roadmap_id>/pyq/sync', methods=['POST'])
+@login_required
+@rate_limit(3, 300, scope="pyq.sync")
+def force_pyq_sync(roadmap_id):
+    roadmap = Roadmap.query.get_or_404(roadmap_id)
+    if roadmap.user_id != session['user_id']:
+        return redirect(url_for('dashboard.dashboard'))
+    if not _is_admin():
+        flash("The PYQ cache refresh button is available to the platform admin only.")
+        return redirect(url_for('dashboard.practice', roadmap_id=roadmap.id))
+    stats = ensure_pyq_synced(force=True, wait=True)
+    detail = []
+    for key in ("prelims_state", "mains_state"):
+        state = stats.get(key) or {}
+        if state.get("status") == "failed":
+            detail.append(state.get("detail") or f"{key} sync failed")
+    if detail:
+        flash("PYQ refresh finished with errors: " + " ".join(detail))
+    else:
+        flash(
+            f"PYQ cache refreshed: {stats.get('prelims_total', 0)} prelims and "
+            f"{stats.get('mains_total', 0)} mains questions."
+        )
+    if request.form.get("next") == "materials":
+        return redirect(url_for('dashboard.materials', roadmap_id=roadmap.id))
+    return redirect(url_for('dashboard.practice', roadmap_id=roadmap.id))
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/quiz', methods=['GET'])
 @login_required
+@rate_limit(60, 60, scope="quiz.generate")
 def quiz(roadmap_id):
     roadmap = Roadmap.query.get_or_404(roadmap_id)
     if roadmap.user_id != session['user_id']:
         return redirect(url_for('dashboard.dashboard'))
-    if not _has_table("quiz_result"):
-        flash("Quiz history is temporarily unavailable until the database schema is updated.")
+    if not (_has_table("quiz_result") and _has_quiz_question_schema()):
+        flash("Tests are temporarily unavailable until the database schema is updated.")
         return redirect(url_for('dashboard.dashboard'))
-    amount = _safe_int(request.args.get("amount", 10), 10, 5, 20)
-    difficulty = request.args.get("difficulty", "medium")
+
     mode = request.args.get("mode", "standard")
-    if mode not in {"standard", "weekly"}:
+    if mode not in {"standard", "weekly", "pyq", "mock", "open"}:
         mode = "standard"
+    if roadmap.roadmap_type != "upsc" and mode in {"pyq", "mock", "open"}:
+        mode = "standard"
+
+    if mode == "mock":
+        amount = 100
+    elif mode == "weekly":
+        amount = _safe_int(request.args.get("amount", 10), 10, 5, 20)
+    else:
+        amount = _safe_int(request.args.get("amount", 10), 10, 5, 50)
+    difficulty = request.args.get("difficulty", "medium")
     if difficulty not in {"easy", "medium", "hard"}:
         difficulty = "medium"
+
+    retest_topics = []
+    retest_id = request.args.get("retest", type=int)
+    if retest_id and _has_quiz_question_attempt_schema():
+        prior = QuizResult.query.filter_by(
+            id=retest_id, user_id=session['user_id'], roadmap_id=roadmap.id
+        ).first()
+        if prior is not None:
+            rows = (
+                db.session.query(QuizQuestion.category)
+                .join(QuizQuestionAttempt, QuizQuestionAttempt.question_id == QuizQuestion.id)
+                .filter(
+                    QuizQuestionAttempt.quiz_result_id == prior.id,
+                    QuizQuestionAttempt.is_correct.is_(False),
+                )
+                .all()
+            )
+            for (category,) in rows:
+                label = re.split(r"\s+·\s+", category or "", maxsplit=1)[0].strip()
+                if label and label not in {"General", "General Studies"} and label not in retest_topics:
+                    retest_topics.append(label)
+            retest_topics = retest_topics[:8]
+            if not retest_topics:
+                flash("That attempt had no incorrect answers to build a retest from.")
+                return redirect(url_for('dashboard.quiz', roadmap_id=roadmap.id))
+
     tasks = Task.query.filter_by(roadmap_id=roadmap.id).order_by(Task.order_index.asc()).all()
-    raw_questions, focus_topics = _build_assessment_questions(roadmap, tasks, amount=amount, difficulty=difficulty, mode=mode)
+    pyq_stats = ensure_pyq_synced(wait=True) if roadmap.roadmap_type == "upsc" else None
+    raw_questions, focus_topics = _build_assessment_questions(
+        roadmap, tasks, amount=amount, difficulty=difficulty, mode=mode,
+        focus_topics=retest_topics or None,
+    )
     if not raw_questions:
-        flash("Quiz generator is busy. Try again in a minute.")
+        if roadmap.roadmap_type == "upsc":
+            flash("The free PYQ cache is not ready yet. Use the official UPSC links below and retry shortly.")
+        else:
+            flash("No test questions were available for this roadmap yet. Add more topics and retry.")
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
-    questions = _persist_quiz_questions(roadmap, raw_questions, difficulty, mode) if _has_quiz_question_schema() else raw_questions
-    recent_results = QuizResult.query.filter_by(user_id=session['user_id'], roadmap_id=roadmap.id).order_by(QuizResult.attempted_at.desc()).limit(5).all()
-    return render_template("quiz.html", roadmap=roadmap, questions=questions, recent_results=recent_results, selected_amount=amount, selected_difficulty=difficulty, mode=mode, focus_topics=focus_topics)
+
+    questions = _persist_quiz_questions(roadmap, raw_questions, difficulty, mode)
+    recent_results = QuizResult.query.filter_by(
+        user_id=session['user_id'], roadmap_id=roadmap.id
+    ).order_by(QuizResult.attempted_at.desc()).limit(5).all()
+    duration = 120 if mode == "mock" else 20 if mode == "weekly" else max(10, len(questions) * 2)
+    return render_template(
+        "quiz.html",
+        roadmap=roadmap,
+        questions=questions,
+        recent_results=recent_results,
+        selected_amount=amount,
+        selected_difficulty=difficulty,
+        mode=mode,
+        focus_topics=focus_topics,
+        is_retest=bool(retest_topics),
+        duration_minutes=duration,
+        pyq_stats=pyq_stats,
+        official_pyq_url=OFFICIAL_PYQ_URL,
+        official_answer_key_url=OFFICIAL_ANSWER_KEY_URL,
+        pyq_attribution=PYQ_ATTRIBUTION,
+    )
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/quiz/submit', methods=['POST'])
 @login_required
+@rate_limit(30, 60, scope="quiz.submit")
 def quiz_submit(roadmap_id):
     roadmap = Roadmap.query.get_or_404(roadmap_id)
     if roadmap.user_id != session['user_id']:
         return redirect(url_for('dashboard.dashboard'))
-    total = int(request.form.get("total", 0))
+    if not (_has_table("quiz_result") and _has_quiz_question_schema()):
+        flash("Tests are temporarily unavailable until the database schema is updated.")
+        return redirect(url_for('dashboard.dashboard'))
+
+    mode = request.form.get("mode", "standard")
+    if mode not in {"standard", "weekly", "pyq", "mock", "open"}:
+        mode = "standard"
+
+    submitted = []
+    for key in request.form:
+        if not key.startswith("qid_"):
+            continue
+        idx = key[4:]
+        qid = request.form.get(key, "")
+        if qid.isdigit():
+            submitted.append((idx, int(qid), request.form.get(f"q_{idx}", "")))
+
+    question_ids = [qid for _, qid, _ in submitted]
+    question_map = {
+        item.id: item
+        for item in QuizQuestion.query.filter(
+            QuizQuestion.id.in_(question_ids) if question_ids else False,
+            QuizQuestion.user_id == session["user_id"],
+            QuizQuestion.roadmap_id == roadmap.id,
+        ).all()
+    } if question_ids else {}
+
     correct = 0
     incorrect = 0
+    unanswered = 0
     answer_rows = []
-    question_map = {}
-    if _has_quiz_question_schema():
-        question_ids = []
-        for idx in range(total):
-            qid = request.form.get(f"qid_{idx}")
-            if qid and qid.isdigit():
-                question_ids.append(int(qid))
-        if question_ids:
-            question_map = {
-                item.id: item
-                for item in QuizQuestion.query.filter(
-                    QuizQuestion.id.in_(question_ids),
-                    QuizQuestion.user_id == session["user_id"],
-                    QuizQuestion.roadmap_id == roadmap.id,
-                ).all()
-            }
-    for idx in range(total):
-        selected = request.form.get(f"q_{idx}")
-        if not selected:
+    review_items = []
+    for idx, qid, selected in submitted:
+        row = question_map.get(qid)
+        if row is None:
             continue
-        answer = None
-        question_id = request.form.get(f"qid_{idx}")
-        if question_id and question_id.isdigit() and question_map:
-            row = question_map.get(int(question_id))
-            if row:
-                answer = row.correct_answer
-                answer_rows.append((row.id, selected, selected == answer))
-        if answer is None:
-            answer = request.form.get(f"a_{idx}")
-        if selected == answer:
-            correct += 1
+        try:
+            options = json.loads(row.options_json or "[]")
+        except (TypeError, ValueError):
+            options = []
+        selected = selected.strip().lower()
+        if selected not in {"a", "b", "c", "d"}:
+            unanswered += 1
+            is_correct = False
+            selected_answer = None
         else:
-            incorrect += 1
-    score = (correct * 2) - (incorrect * (2 / 3))
-    accuracy = round((correct / max(total, 1)) * 100, 2)
+            is_correct = selected == row.correct_answer
+            selected_answer = selected
+            if is_correct:
+                correct += 1
+            else:
+                incorrect += 1
+        answer_rows.append((row.id, selected_answer, is_correct))
+        correct_index = "abcd".find(row.correct_answer)
+        review_items.append({
+            "question": row.question_text,
+            "options": options,
+            "selected": selected_answer,
+            "correct": row.correct_answer,
+            "correct_text": options[correct_index] if 0 <= correct_index < len(options) else row.correct_answer,
+            "is_correct": is_correct,
+            "category": row.category,
+            "source": row.source,
+            "source_url": row.source_url,
+        })
+
+    total = len(review_items)
+    if total == 0:
+        flash("That test submission was empty. Please generate a fresh test.")
+        return redirect(url_for('dashboard.quiz', roadmap_id=roadmap.id, mode=mode))
+
+    negative_marking = roadmap.roadmap_type == "upsc" and mode != "open"
+    score = (correct * 2) - (incorrect * (2 / 3)) if negative_marking else correct
+    accuracy = round((correct / total) * 100, 2)
     result = QuizResult(
         total_questions=total,
         correct=correct,
         incorrect=incorrect,
         score=round(score, 2),
+        mode=mode,
         user_id=session['user_id'],
         roadmap_id=roadmap.id
     )
@@ -3379,19 +4957,57 @@ def quiz_submit(roadmap_id):
                 )
             )
     db.session.commit()
+
     analysis = []
+    if total >= 100:
+        analysis.append("Full-length mock completed. Review every wrong answer before your next mock.")
     if accuracy >= 75:
-        analysis.append("Strong quiz performance. Keep test rhythm steady and keep revising weak pockets.")
+        analysis.append("Strong test performance. Keep the rhythm steady and revise weak pockets.")
     elif accuracy >= 50:
-        analysis.append("Moderate performance. Revision and more PYQ-based testing will improve accuracy.")
+        analysis.append("Moderate performance. Revise the missed subjects and retest after consolidation.")
     else:
         analysis.append("This score suggests you should slow down, revise, and retest after consolidating basics.")
-    if incorrect > correct:
+    if negative_marking and incorrect > correct:
         analysis.append("Too many risky attempts. Work on elimination and selective answering.")
+    if unanswered:
+        analysis.append(f"{unanswered} question(s) were left blank. In UPSC prelims, a calculated skip is often better than a guess.")
     if correct < max(total // 2, 4):
         analysis.append("Focus on concept revision before the next test instead of adding too many new topics.")
+    weak_topics = []
+    for item in review_items:
+        if item["is_correct"]:
+            continue
+        label = re.split(r"\s+·\s+", item.get("category") or "", maxsplit=1)[0].strip()
+        if label and label not in {"General", "General Studies"} and label not in weak_topics:
+            weak_topics.append(label)
+    weak_topics = weak_topics[:8]
+    retest_url = None
+    if weak_topics:
+        retest_url = url_for(
+            'dashboard.quiz',
+            roadmap_id=roadmap.id,
+            mode='open' if mode == 'open' else 'standard',
+            amount=max(5, min(total, 20)),
+            retest=result.id,
+        )
     next_steps = _build_quiz_next_steps(accuracy, result)
-    return render_template("quiz_result.html", roadmap=roadmap, result=result, accuracy=accuracy, analysis=analysis, next_steps=next_steps)
+    return render_template(
+        "quiz_result.html",
+        roadmap=roadmap,
+        result=result,
+        accuracy=accuracy,
+        analysis=analysis,
+        next_steps=next_steps,
+        review_items=review_items,
+        unanswered=unanswered,
+        negative_marking=negative_marking,
+        weak_topics=weak_topics,
+        retest_url=retest_url,
+        mode=mode,
+        official_pyq_url=OFFICIAL_PYQ_URL,
+        official_answer_key_url=OFFICIAL_ANSWER_KEY_URL,
+        pyq_attribution=PYQ_ATTRIBUTION,
+    )
 
 
 @dashboard_bp.route('/roadmap/<int:roadmap_id>/pyq', methods=['POST'])
@@ -3478,26 +5094,6 @@ def update_test_status(roadmap_id, test_id):
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
 
-@dashboard_bp.route('/api/roadmap/<int:roadmap_id>/generate-test')
-@login_required
-def api_generate_test(roadmap_id):
-    roadmap = Roadmap.query.get_or_404(roadmap_id)
-    if roadmap.user_id != session['user_id']:
-        return {"error": "unauthorized"}, 403
-    questions = _fetch_opentdb_questions(amount=10, difficulty="medium")
-    if not questions:
-        topics = [t.title for t in Task.query.filter_by(roadmap_id=roadmap.id).limit(10).all()]
-        questions = [
-            {
-                "question": f"Explain the key ideas in {topic}.",
-                "options": ["Definition", "Example", "Counterpoint", "Summary"],
-                "answer": "Summary"
-            }
-            for topic in topics[:10]
-        ]
-    return {"questions": questions}
-
-
 @dashboard_bp.route('/questions/<int:question_id>/attempt', methods=['POST'])
 @login_required
 def attempt_question(question_id):
@@ -3514,29 +5110,6 @@ def attempt_question(question_id):
     db.session.add(attempt)
     db.session.commit()
     return redirect(request.referrer or url_for('dashboard.dashboard'))
-
-
-@dashboard_bp.route('/api/roadmap/<int:roadmap_id>/questions')
-@login_required
-def api_questions(roadmap_id):
-    roadmap = Roadmap.query.get_or_404(roadmap_id)
-    if roadmap.user_id != session['user_id']:
-        return {"error": "unauthorized"}, 403
-    _ensure_upsc_question_bank()
-    questions = Question.query.filter_by(exam="UPSC").limit(100).all()
-    payload = [
-        {
-            "id": q.id,
-            "exam": q.exam,
-            "subject": q.subject,
-            "topic": q.topic,
-            "question": q.question_text,
-            "answer": q.answer_text,
-            "difficulty": q.difficulty
-        }
-        for q in questions
-    ]
-    return {"questions": payload}
 
 
 @dashboard_bp.route('/api/questions/<int:question_id>/attempt', methods=['POST'])
@@ -3610,6 +5183,7 @@ def refresh_resources(roadmap_id, task_id):
             url=res["url"],
             summary=res.get("use_case") or res.get("summary", ""),
             score=res.get("score", 0.95 if roadmap.roadmap_type == "upsc" else 0.0),
+            last_checked_at=_utc_now().replace(tzinfo=None),
             task_id=task.id
         ))
     task.last_resource_refresh = _utc_now().replace(tzinfo=None)
@@ -3787,7 +5361,12 @@ def rebalance(roadmap_id):
     if not remaining_tasks:
         return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
 
-    timeline_weeks = int(request.form.get('timeline_weeks', 0) or 0)
+    plan_days = _safe_int(request.form.get('plan_days'), roadmap.plan_days or 0, 0, 730)
+    hours_per_day = _safe_float(request.form.get('hours_per_day'), roadmap.hours_per_day or 2, 0.5, 16)
+    timeline_weeks = _safe_int(request.form.get('timeline_weeks', 0) or 0, 0, 0, 104)
+    roadmap.plan_days = plan_days or None
+    roadmap.hours_per_day = hours_per_day
+    roadmap.hours_per_week = max(1, round(hours_per_day * _safe_int(roadmap.study_days_per_week, 5, 1, 7)))
     _auto_adjust_roadmap_timeline(roadmap, start_date=_utc_today(), timeline_weeks=timeline_weeks)
     db.session.commit()
     return redirect(url_for('dashboard.view_roadmap', roadmap_id=roadmap.id))
@@ -3981,22 +5560,32 @@ def _build_upsc_dashboard_data(tasks, tests):
 
 
 def _persist_roadmap(roadmap_type, title, raw_text, topics, projects, start_date, timeline_weeks,
-                     hours_per_week, study_days_per_week, upsc_focus="", upsc_optional_subject="", pace_mode="steady"):
+                     hours_per_week, study_days_per_week, upsc_focus="", upsc_optional_subject="", pace_mode="steady",
+                     plan_days=None, hours_per_day=None, assignments=None):
     task_specs, total_hours, computed_end = _build_tasks(
-        roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week, study_days_per_week, pace_mode, raw_text
+        roadmap_type, topics, projects, start_date, timeline_weeks, hours_per_week,
+        study_days_per_week, pace_mode, raw_text,
+        plan_days=plan_days, hours_per_day=hours_per_day, assignments=assignments,
     )
     target_date = computed_end
+    if hours_per_day is None:
+        hours_per_day = _safe_float(hours_per_week / max(study_days_per_week, 1), 2, 0.5, 16)
+    plan_days = plan_days or ((target_date - start_date).days + 1)
 
+    stored_source = raw_text or f"UPSC Focus: {upsc_focus}\nOptional Subject: {upsc_optional_subject}"
+    stored_source = _replace_metadata_line(stored_source, "Plan Topics", json.dumps(topics, ensure_ascii=False))
     roadmap = Roadmap(
         title=title,
         roadmap_type=roadmap_type,
-        source_text=(raw_text or f"UPSC Focus: {upsc_focus}\nOptional Subject: {upsc_optional_subject}")[:5000],
+        source_text=stored_source[:12000],
         start_date=start_date,
         target_date=target_date,
         total_tasks=len(task_specs),
         completed_tasks=0,
         total_hours_est=total_hours,
         hours_per_week=hours_per_week,
+        hours_per_day=hours_per_day,
+        plan_days=plan_days,
         study_days_per_week=study_days_per_week,
         timezone=current_app.config.get("DEFAULT_TIMEZONE", "Asia/Kolkata"),
         resource_fetch_status="idle",
@@ -4005,7 +5594,9 @@ def _persist_roadmap(roadmap_type, title, raw_text, topics, projects, start_date
     db.session.add(roadmap)
     db.session.flush()
 
-    auto_fetch = current_app.config.get("AUTO_FETCH_RESOURCES_ON_CREATE", False)
+    auto_fetch = bool(current_app.config.get("AUTO_FETCH_RESOURCES_ON_CREATE", False))
+    if roadmap_type == "career" and current_app.config.get("ENABLE_EXTERNAL_RESOURCES", True):
+        auto_fetch = True
     task_ids = []
     for spec in task_specs:
         task = Task(
@@ -4030,8 +5621,24 @@ def _persist_roadmap(roadmap_type, title, raw_text, topics, projects, start_date
 @dashboard_bp.route('/uploads/<path:filename>')
 @login_required
 def get_upload(filename):
+    owned_task = (
+        Task.query.join(Roadmap, Task.roadmap_id == Roadmap.id)
+        .filter(
+            Task.evidence_path == filename,
+            Roadmap.user_id == session["user_id"],
+        )
+        .first()
+    )
+    if owned_task is None:
+        flash("That attachment is not available.")
+        return redirect(url_for('dashboard.dashboard'))
+
     storage_client = _supabase_client()
     if storage_client and "/" in filename:
+        user_prefix = f"{session['user_id']}/"
+        if not filename.startswith(user_prefix):
+            flash("That attachment is not available.")
+            return redirect(url_for('dashboard.dashboard'))
         bucket = current_app.config.get("SUPABASE_STORAGE_BUCKET", "evidence")
         expires = current_app.config.get("SIGNED_URL_EXPIRES_SECONDS", 600)
         try:

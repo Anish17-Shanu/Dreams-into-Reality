@@ -18,6 +18,8 @@ create table if not exists roadmap (
   completed_tasks integer default 0,
   total_hours_est double precision default 0,
   hours_per_week integer default 6,
+  hours_per_day double precision default 2,
+  plan_days integer,
   study_days_per_week integer default 5,
   timezone varchar(60) default 'Asia/Kolkata',
   streak integer default 0,
@@ -89,6 +91,15 @@ create table if not exists question (
   answer_text text,
   difficulty varchar(20) default 'medium',
   is_public boolean default true,
+  stage varchar(20),
+  year integer,
+  paper varchar(80),
+  options_json text,
+  correct_answer text,
+  source_url varchar(600),
+  source_name varchar(160),
+  external_id varchar(120),
+  quality_score double precision default 0,
   created_at timestamp without time zone default now()
 );
 
@@ -145,6 +156,7 @@ create table if not exists quiz_result (
   correct integer default 0,
   incorrect integer default 0,
   score double precision default 0,
+  mode varchar(20) default 'standard',
   attempted_at timestamp without time zone default now(),
   user_id bigint not null references "user"(id) on delete cascade,
   roadmap_id bigint not null references roadmap(id) on delete cascade
@@ -159,6 +171,7 @@ create table if not exists quiz_question (
   correct_answer text not null,
   category varchar(180),
   source varchar(80),
+  source_url varchar(600),
   difficulty varchar(20) default 'medium',
   mode varchar(20) default 'standard',
   created_at timestamp without time zone default now(),
@@ -181,6 +194,46 @@ create index if not exists idx_quiz_attempt_result on quiz_question_attempt(quiz
 
 create index if not exists idx_question_exam on question(exam);
 create index if not exists idx_attempt_user on question_attempt(user_id);
+
+-- Idempotent upgrades for databases created before day/hour planning and the
+-- free previous-year-question (PYQ) cache existed.
+alter table roadmap add column if not exists hours_per_day double precision default 2;
+alter table roadmap add column if not exists plan_days integer;
+alter table question add column if not exists stage varchar(20);
+alter table question add column if not exists year integer;
+alter table question add column if not exists paper varchar(80);
+alter table question add column if not exists options_json text;
+alter table question add column if not exists correct_answer text;
+alter table question add column if not exists source_url varchar(600);
+alter table question add column if not exists source_name varchar(160);
+alter table question add column if not exists external_id varchar(120);
+alter table question add column if not exists quality_score double precision default 0;
+alter table quiz_result add column if not exists mode varchar(20) default 'standard';
+alter table quiz_question add column if not exists source_url varchar(600);
+
+create table if not exists pyq_sync_state (
+  id bigserial primary key,
+  source varchar(160) unique not null,
+  status varchar(20) default 'idle',
+  item_count integer default 0,
+  detail varchar(300),
+  last_synced_at timestamp without time zone,
+  updated_at timestamp without time zone default now()
+);
+
+-- Cache durability, verification, and conditional-fetch metadata.
+alter table question add column if not exists verification varchar(20) default 'archive';
+alter table pyq_sync_state add column if not exists etag varchar(300);
+alter table pyq_sync_state add column if not exists last_modified varchar(120);
+alter table pyq_sync_state add column if not exists content_hash varchar(64);
+alter table resource add column if not exists last_checked_at timestamp without time zone;
+alter table resource add column if not exists is_alive boolean default true;
+
+create index if not exists idx_question_verification on question(verification);
+
+create index if not exists idx_question_stage_year on question(stage, year);
+create index if not exists idx_question_external on question(external_id);
+create index if not exists idx_question_public on question(is_public);
 
 create index if not exists idx_roadmap_user_id on roadmap(user_id);
 create index if not exists idx_task_roadmap_id on task(roadmap_id);
@@ -205,6 +258,7 @@ alter table mock_test_schedule enable row level security;
 alter table quiz_result enable row level security;
 alter table quiz_question enable row level security;
 alter table quiz_question_attempt enable row level security;
+alter table pyq_sync_state enable row level security;
 
 revoke all on table "user" from anon, authenticated;
 revoke all on table roadmap from anon, authenticated;
@@ -219,6 +273,7 @@ revoke all on table mock_test_schedule from anon, authenticated;
 revoke all on table quiz_result from anon, authenticated;
 revoke all on table quiz_question from anon, authenticated;
 revoke all on table quiz_question_attempt from anon, authenticated;
+revoke all on table pyq_sync_state from anon, authenticated;
 
 -- If you later want public API access for selected records, add explicit RLS
 -- policies then grant only the minimum required privileges back.

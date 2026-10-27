@@ -2,12 +2,18 @@ services:
   - type: web
     name: dreams-into-reality
     env: python
+    plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn --workers 1 --threads 8 --timeout 120 --access-logfile - app:app
+    healthCheckPath: /healthz
     envVars:
-      - key: DATABASE_URL
-        sync: false
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: APP_ENV
+        value: "production"
       - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
         sync: false
       - key: ENABLE_EXTERNAL_RESOURCES
         value: "true"
@@ -15,12 +21,26 @@ services:
         value: "7"
       - key: REQUEST_TIMEOUT_SECONDS
         value: "8"
-      - key: OPENAI_API_KEY
+      - key: PYQ_SYNC_ENABLED
+        value: "true"
+      - key: PYQ_REFRESH_DAYS
+        value: "7"
+      - key: PYQ_REQUEST_TIMEOUT_SECONDS
+        value: "20"
+      - key: PYQ_SEED_ENABLED
+        value: "true"
+      - key: ADMIN_EMAILS
         sync: false
-      - key: OPENAI_MODEL
-        value: "gpt-5"
-      - key: AI_TOPIC_EXTRACTION_ENABLED
-        value: "false"
+      - key: RESOURCE_MAX_ITEMS
+        value: "6"
+      - key: RESOURCE_VERIFY_URLS
+        value: "true"
+      - key: RATELIMIT_ENABLED
+        value: "true"
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      - key: ORIGIN_CHECK_ENABLED
+        value: "true"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY

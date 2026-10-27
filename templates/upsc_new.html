@@ -54,22 +54,22 @@
         </label>
         <div class="inline-fields">
             <label>
-                Timeline (weeks, optional)
-                <input type="number" name="timeline_weeks" min="0" max="52" value="0">
+                Days until your target (optional)
+                <input type="number" name="plan_days" min="0" max="730" value="0">
             </label>
             <label>
-                Start date
-                <input type="date" name="start_date">
-            </label>
-        </div>
-        <div class="inline-fields">
-            <label>
-                Study hours per week
-                <input type="number" name="hours_per_week" min="1" max="40" value="20">
+                Hours per study day
+                <input type="number" name="hours_per_day" min="0.5" max="16" step="0.5" value="3">
             </label>
             <label>
                 Study days per week
                 <input type="number" name="study_days_per_week" min="1" max="7" value="6">
+            </label>
+        </div>
+        <div class="inline-fields">
+            <label>
+                Start date
+                <input type="date" name="start_date">
             </label>
             <label>
                 Mission intensity
@@ -80,6 +80,7 @@
                 </select>
             </label>
         </div>
+        <p class="muted">Leave days as 0 to auto-estimate. The plan is spread across your study days at the daily hours you choose, and it will warn you if the target is too tight.</p>
         <div class="inline-fields">
             <label>
                 Current level

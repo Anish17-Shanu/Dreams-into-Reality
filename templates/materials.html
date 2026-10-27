@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <span class="pill">Materials</span>
+            <h1>Free UPSC Materials Hub</h1>
+            <p class="muted">Official and permanently free sources, grouped by how you should use them. No paid courses or scraped content.</p>
+        </div>
+        <div class="test-meta">
+            <strong>{{ coverage.prelims_total + coverage.mains_total }}</strong>
+            <span class="muted">PYQs available in-app</span>
+        </div>
+    </div>
+
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Start with the official base</h3>
+            <div class="action-links">
+                <a class="primary" href="{{ official_pyq_url }}" target="_blank" rel="noopener">UPSC previous year papers</a>
+                <a class="ghost" href="{{ official_answer_key_url }}" target="_blank" rel="noopener">Official answer keys</a>
+                <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id, mode='mock') }}">Take a 100-Q mock</a>
+            </div>
+            <p class="muted">Use the official syllabus and papers as the source of truth. The in-app PYQ cache exists to make practice fast, not to replace the official documents.</p>
+        </article>
+        <article class="card soft-card">
+            <h3>PYQ coverage in this app</h3>
+            <div class="simple-list">
+                <div><strong>{{ coverage.prelims_total }} prelims MCQs</strong><p class="muted">{{ coverage.verified_total }} with cross-checked answer keys. Years: {{ coverage.years|join(', ') }}.</p></div>
+                <div><strong>{{ coverage.mains_total }} mains questions</strong><p class="muted">GS-I, GS-II, and GS-III with answer frameworks. {{ coverage.archive_total }} open-archive items in total.</p></div>
+                <div><strong>Zero cost</strong><p class="muted">No LLM, OCR, paid API, or subscription is used for tests.</p></div>
+            </div>
+            <p class="muted small">
+                Last sync:
+                {{ coverage.last_synced_at.strftime('%d %b %Y, %H:%M') if coverage.last_synced_at else 'bundled seed only' }}.
+                {% if coverage.seed_available %}A bundled seed keeps tests available before the first download.{% endif %}
+            </p>
+            {% for name, state in [('Prelims', coverage.prelims_state), ('Mains', coverage.mains_state)] %}
+                {% if state and state.status == 'failed' %}
+                <p class="muted small coverage-error">{{ name }} refresh failed: {{ state.detail }}</p>
+                {% endif %}
+            {% endfor %}
+            {% if is_admin %}
+            <form method="POST" action="{{ url_for('dashboard.force_pyq_sync', roadmap_id=roadmap.id) }}" class="inline-form">
+                <input type="hidden" name="next" value="materials">
+                <button type="submit" class="ghost">Refresh PYQ cache now</button>
+            </form>
+            {% endif %}
+        </article>
+    </div>
+
+    {% for group, items in groups.items() %}
+    <section class="material-group">
+        <div class="panel-header panel-header-start">
+            <div>
+                <h2>{{ group }}</h2>
+                <p class="muted">{{ items|length }} resource(s)</p>
+            </div>
+        </div>
+        <div class="grid grid-3 compact-grid">
+            {% for item in items %}
+            <article class="card soft-card material-card">
+                <div class="chip-row">
+                    {% for tag in item.tags[:3] %}
+                    <span class="chip">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+                <h3><a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title }}</a></h3>
+                <p class="muted">{{ item.use_case }}</p>
+                <p class="muted small">{{ item.provider|upper }}</p>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+
+    <div class="attribution-note">
+        <p class="muted">{{ pyq_attribution }}</p>
+        <div class="action-links">
+            <a class="ghost" href="{{ url_for('dashboard.practice', roadmap_id=roadmap.id) }}">Practice Vault</a>
+            <a class="ghost" href="{{ url_for('dashboard.mains_practice', roadmap_id=roadmap.id) }}">Mains practice</a>
+            <a class="ghost" href="{{ url_for('dashboard.interview_prep', roadmap_id=roadmap.id) }}">Interview practice</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

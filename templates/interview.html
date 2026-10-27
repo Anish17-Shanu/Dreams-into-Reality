@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <span class="pill">Interview</span>
+            <h1>Interview Practice</h1>
+            <p class="muted">
+                Original practice prompts built around the UPSC personality test. They are not official transcripts.
+                Answer aloud for two minutes, then compare with the approach.
+            </p>
+        </div>
+        <div class="test-meta">
+            <strong id="interview-timer">2:00</strong>
+            <span class="muted">speaking timer</span>
+        </div>
+    </div>
+
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Your profile focus</h3>
+            <div class="simple-list">
+                <div><strong>Optional subject</strong><p class="muted">{{ profile.optional_subject or 'Not set in this mission' }}</p></div>
+                <div><strong>Weak areas</strong><p class="muted">{{ profile.weak_areas or 'Use the prompts below to find them' }}</p></div>
+                <div><strong>Target outcome</strong><p class="muted">{{ profile.target_outcome or 'Calm, structured, honest answers' }}</p></div>
+            </div>
+        </article>
+        <article class="card soft-card">
+            <h3>Practice rules</h3>
+            <div class="simple-list">
+                <div><strong>Answer in 60-90 seconds</strong><p class="muted">Long answers lose the panel. Keep one clear line of reasoning.</p></div>
+                <div><strong>Take a position</strong><p class="muted">Balanced does not mean evasive. Choose a stand, then acknowledge the trade-off.</p></div>
+                <div><strong>Use your own evidence</strong><p class="muted">Draw on your district, education, work, or optional subject. Do not quote unverified data.</p></div>
+            </div>
+        </article>
+    </div>
+
+    <div class="question-grid">
+        {% for item in prompts %}
+        <article class="question-card">
+            <div class="question-head">
+                <span class="pill">{{ item.dimension }}</span>
+                <button type="button" class="ghost interview-start" data-seconds="120">Start 2-min timer</button>
+            </div>
+            <p class="question-text">{{ item.prompt }}</p>
+            <details>
+                <summary>Show answer approach</summary>
+                <p class="framework-text">{{ item.approach }}</p>
+                <p class="muted">Follow-up the panel may ask: {{ item.follow_up }}</p>
+            </details>
+        </article>
+        {% endfor %}
+    </div>
+
+    <div class="attribution-note">
+        <p class="muted">Interview prompts are original free practice material, not UPSC questions. Link this practice to your DAF, optional subject, and current affairs reading.</p>
+        <div class="action-links">
+            <a class="primary" href="{{ url_for('dashboard.mains_practice', roadmap_id=roadmap.id) }}">Mains PYQ practice</a>
+            <a class="ghost" href="{{ url_for('dashboard.materials', roadmap_id=roadmap.id) }}">Materials hub</a>
+            <a class="ghost" href="{{ official_pyq_url }}" target="_blank" rel="noopener">Official UPSC papers</a>
+        </div>
+    </div>
+</section>
+<script>
+    (function () {
+        const display = document.getElementById("interview-timer");
+        let interval = null;
+        document.querySelectorAll(".interview-start").forEach((button) => {
+            button.addEventListener("click", () => {
+                if (interval) clearInterval(interval);
+                let remaining = parseInt(button.dataset.seconds, 10);
+                function render() {
+                    const m = Math.floor(remaining / 60);
+                    const s = remaining % 60;
+                    display.textContent = `${m}:${String(s).padStart(2, "0")}`;
+                    display.classList.toggle("timer-low", remaining <= 30);
+                }
+                render();
+                interval = setInterval(() => {
+                    remaining -= 1;
+                    if (remaining <= 0) {
+                        clearInterval(interval);
+                        display.textContent = "Stop";
+                        return;
+                    }
+                    render();
+                }, 1000);
+            });
+        });
+    })();
+</script>
+{% endblock %}

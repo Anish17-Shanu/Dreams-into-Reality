@@ -23,6 +23,44 @@
         </div>
     </div>
 
+    <article class="momentum-panel momentum-{{ roadmap_pulse.tone }} compact-momentum">
+        <div class="momentum-top">
+            <div>
+                <p class="eyebrow">Your current title</p>
+                <h3>{{ roadmap_pulse.title }}</h3>
+                <p class="momentum-message">{{ roadmap_pulse.message }}</p>
+                {% if roadmap_pulse.badges %}
+                <div class="badge-row">
+                    {% for badge in roadmap_pulse.badges %}
+                    <span class="badge badge-{{ badge.tone }}" title="{{ badge.detail }}">{{ badge.name }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="momentum-score">
+                <strong>{{ roadmap_pulse.score }}</strong>
+                <span>momentum score</span>
+                <div class="progress">
+                    <div class="progress-bar" style="width: {{ roadmap_pulse.score }}%"></div>
+                </div>
+            </div>
+        </div>
+        {% if roadmap_pulse.next_badge %}
+        <div class="next-badge">
+            <div class="next-badge-text">
+                <strong>Next badge: {{ roadmap_pulse.next_badge.name }}</strong>
+                <p class="muted">{{ roadmap_pulse.next_badge.detail }}</p>
+            </div>
+            <div class="next-badge-progress">
+                <div class="progress">
+                    <div class="progress-bar" style="width: {{ roadmap_pulse.next_badge.progress }}%"></div>
+                </div>
+                <span>{{ roadmap_pulse.next_badge.value }}/{{ roadmap_pulse.next_badge.target }}</span>
+            </div>
+        </div>
+        {% endif %}
+    </article>
+
     <div class="grid grid-3 compact-grid">
         <article class="card soft-card">
             <p class="eyebrow">Today</p>
@@ -70,16 +108,45 @@
             <p class="muted">{% if ns.next_task %}Due {{ ns.next_task.due_date or 'when you are ready' }}{% else %}You are caught up on this plan.{% endif %}</p>
         </article>
         <article class="card summary-card">
-            <p class="eyebrow">Study rhythm</p>
-            <h3>{{ roadmap.hours_per_week }} hrs/week</h3>
-            <p class="muted">{{ roadmap.study_days_per_week }} study days each week</p>
+            <p class="eyebrow">Daily capacity</p>
+            <h3>{{ plan_summary.hours_per_day }} hrs/day</h3>
+            <p class="muted">{{ plan_summary.study_days_per_week }} study days per week · {{ plan_summary.hours_per_week }} hrs/week</p>
         </article>
         <article class="card summary-card">
-            <p class="eyebrow">Timeline</p>
-            <h3>{{ roadmap.target_date }}</h3>
-            <p class="muted">{% if forecast %}Expected finish based on progress: {{ forecast }}{% else %}This plan auto-adjusts as you move forward.{% endif %}</p>
+            <p class="eyebrow">Plan window</p>
+            <h3>{{ plan_summary.actual_days }} days</h3>
+            <p class="muted">Ends {{ plan_summary.finish_date }} · {% if forecast %}progress-based finish: {{ forecast }}{% else %}auto-adjusts as you move{% endif %}</p>
         </article>
     </div>
+
+    <article class="card soft-card plan-math">
+        <div class="plan-math-header">
+            <div>
+                <p class="eyebrow">Your plan at a glance</p>
+                <h3>{{ plan_summary.status }} workload · {{ plan_summary.utilization }}% of available time</h3>
+            </div>
+            <span class="status-chip status-{{ plan_summary.tone }}">{{ plan_summary.status }}</span>
+        </div>
+        <div class="grid grid-4 compact-grid">
+            <div>
+                <strong>{{ plan_summary.scheduled_hours }} hrs</strong>
+                <p class="muted">Study work scheduled</p>
+            </div>
+            <div>
+                <strong>{{ plan_summary.capacity_hours }} hrs</strong>
+                <p class="muted">Capacity across {{ plan_summary.study_days }} study days</p>
+            </div>
+            <div>
+                <strong>{{ plan_summary.buffer_hours }} hrs</strong>
+                <p class="muted">Buffer for revision and PYQs</p>
+            </div>
+            <div>
+                <strong>{{ plan_summary.coverage }}%</strong>
+                <p class="muted">Plan coverage completed</p>
+            </div>
+        </div>
+        <p class="muted">{{ plan_summary.message }}</p>
+    </article>
 
     <div class="grid grid-2 compact-grid">
         <article class="card soft-card">
@@ -193,10 +260,15 @@
             <h3>Helpful actions</h3>
             <div class="action-links">
                 {% if roadmap.roadmap_type == 'upsc' %}
+                <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">PYQ test</a>
+                <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id, mode='weekly') }}">Weekly PYQ assessment</a>
+                <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id, mode='mock') }}">100-Q prelims mock</a>
+                <a class="ghost" href="{{ url_for('dashboard.mains_practice', roadmap_id=roadmap.id) }}">Mains PYQs</a>
+                <a class="ghost" href="{{ url_for('dashboard.interview_prep', roadmap_id=roadmap.id) }}">Interview prep</a>
+                <a class="ghost" href="{{ url_for('dashboard.materials', roadmap_id=roadmap.id) }}">Materials hub</a>
                 <a class="ghost" href="{{ url_for('dashboard.practice', roadmap_id=roadmap.id) }}">Practice Vault</a>
-                <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">Quick Quiz</a>
-                <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id, mode='weekly') }}">Weekly assessment</a>
                 {% endif %}
+                <a class="ghost" href="{{ url_for('dashboard.edit_topics', roadmap_id=roadmap.id) }}">Edit topics</a>
                 <a class="ghost" href="{{ url_for('dashboard.export_csv', roadmap_id=roadmap.id) }}">Export CSV</a>
                 <a class="ghost" href="{{ url_for('dashboard.export_ics', roadmap_id=roadmap.id) }}">Export Calendar</a>
                 <a class="ghost" href="{{ url_for('dashboard.export_summary', roadmap_id=roadmap.id) }}">Study plan</a>
@@ -207,7 +279,8 @@
                 {% endif %}
             </div>
             <form method="POST" action="{{ url_for('dashboard.rebalance', roadmap_id=roadmap.id) }}" class="inline-form">
-                <input type="number" name="timeline_weeks" min="0" max="52" placeholder="New timeline in weeks">
+                <input type="number" name="plan_days" min="0" max="730" value="{{ plan_summary.requested_days }}" placeholder="Days">
+                <input type="number" name="hours_per_day" min="0.5" max="16" step="0.5" value="{{ plan_summary.hours_per_day }}" placeholder="Hours/day">
                 <button type="submit" class="ghost">Rebuild remaining dates</button>
             </form>
             <p class="muted">Resource status: {{ roadmap.resource_fetch_status|capitalize }}</p>
@@ -393,6 +466,18 @@
     </div>
     <div class="grid grid-3 compact-grid">
         <article class="card soft-card">
+            <p class="eyebrow">Path context</p>
+            <h3>{{ career_outcomes.family_label }}</h3>
+            <p class="muted">{{ career_outcomes.outcome }}</p>
+            {% if career_outcomes.toolkit %}
+            <div class="chip-row">
+                {% for tool in career_outcomes.toolkit %}
+                <span class="chip">{{ tool }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </article>
+        <article class="card soft-card">
             <p class="eyebrow">Portfolio meter</p>
             <h3>{{ career_outcomes.portfolio_meter }}%</h3>
             <p class="muted">Measures how much visible project proof is complete.</p>
@@ -400,7 +485,7 @@
         <article class="card soft-card">
             <p class="eyebrow">Job readiness</p>
             <h3>{{ career_outcomes.job_readiness }}%</h3>
-            <p class="muted">Built from project delivery plus proof-oriented career tasks.</p>
+            <p class="muted">Built from projects, assignments, and proof-oriented career tasks.</p>
         </article>
         <article class="card soft-card">
             <p class="eyebrow">Interview workflow</p>
@@ -411,7 +496,7 @@
             </div>
         </article>
     </div>
-    <div class="grid grid-2 compact-grid">
+    <div class="grid grid-3 compact-grid">
         <article class="card soft-card">
             <h3>Project Submission Tracker</h3>
             <div class="simple-list">
@@ -422,6 +507,19 @@
                 </div>
                 {% else %}
                 <div><p class="muted">No project submissions tracked yet.</p></div>
+                {% endfor %}
+            </div>
+        </article>
+        <article class="card soft-card">
+            <h3>Assignment Tracker</h3>
+            <div class="simple-list">
+                {% for item in career_outcomes.assignment_submission %}
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <p class="muted">Status: {{ item.status|replace('_', ' ')|title }}</p>
+                </div>
+                {% else %}
+                <div><p class="muted">No assignments tracked yet.</p></div>
                 {% endfor %}
             </div>
         </article>
@@ -636,6 +734,19 @@
                     {% endif %}
                 </div>
             </div>
+            {% if roadmap.roadmap_type == 'upsc' %}
+            <div class="action-links">
+                {% if test.test_type in ['full_length', 'mock'] and 'Prelims' in test.title %}
+                <a class="primary" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id, mode='mock') }}">Start 100-Q prelims mock</a>
+                {% elif test.test_type in ['sectional', 'diagnostic', 'revision'] %}
+                <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id, mode='standard', amount=30) }}">Start 30-Q PYQ test</a>
+                {% elif test.test_type == 'essay' %}
+                <a class="ghost" href="{{ url_for('dashboard.mains_practice', roadmap_id=roadmap.id, paper='GS-I') }}">Practice mains PYQs</a>
+                {% elif test.test_type == 'interview' %}
+                <a class="ghost" href="{{ url_for('dashboard.interview_prep', roadmap_id=roadmap.id) }}">Practice interview</a>
+                {% endif %}
+            </div>
+            {% endif %}
             <form method="POST" action="{{ url_for('dashboard.update_test_status', roadmap_id=roadmap.id, test_id=test.id) }}" class="inline-form">
                 <select name="status">
                     <option value="planned" {% if test.status == 'planned' %}selected{% endif %}>Planned</option>

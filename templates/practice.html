@@ -11,9 +11,14 @@
 
     <div class="grid grid-3 compact-grid">
         <article class="card summary-card">
-            <p class="eyebrow">PYQ coverage</p>
+            <p class="eyebrow">Free PYQ cache</p>
+            <h3>{{ coverage.prelims_total }} prelims</h3>
+            <p class="muted">{{ coverage.mains_total }} mains questions from {{ coverage.years|join(', ') }}. No LLM or paid API.</p>
+        </article>
+        <article class="card summary-card">
+            <p class="eyebrow">PYQ years marked</p>
             <h3>{{ pyq_total }}</h3>
-            <p class="muted">Years marked complete across tracked exams.</p>
+            <p class="muted">Years you have marked complete in the tracker below.</p>
         </article>
         <article class="card summary-card">
             <p class="eyebrow">Answer writing</p>
@@ -26,6 +31,43 @@
             <p class="muted">{{ practice_coach.recommendation }}</p>
         </article>
     </div>
+
+    <article class="card soft-card coverage-card">
+        <div class="panel-header panel-header-start">
+            <div>
+                <h3>PYQ cache health</h3>
+                <p class="muted">
+                    {{ coverage.verified_total }} official-key verified ·
+                    {{ coverage.archive_total }} open-archive ·
+                    {{ coverage.prelims_total }} prelims / {{ coverage.mains_total }} mains
+                </p>
+            </div>
+            <span class="pill">{{ 'Seed ready' if coverage.seed_available else 'Live cache' }}</span>
+        </div>
+        {% if coverage.by_year %}
+        <div class="chip-row">
+            {% for year, count in coverage.by_year.items() %}
+            <span class="chip">{{ year }} · {{ count }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <p class="muted small">
+            Last sync:
+            {{ coverage.last_synced_at.strftime('%d %b %Y, %H:%M') if coverage.last_synced_at else 'bundled seed only' }}.
+            Auto-refreshes every {{ coverage.refresh_days }} days.
+        </p>
+        {% for name, state in [('Prelims', coverage.prelims_state), ('Mains', coverage.mains_state)] %}
+            {% if state and state.status == 'failed' %}
+            <p class="muted small coverage-error">{{ name }} refresh failed: {{ state.detail }}</p>
+            {% endif %}
+        {% endfor %}
+        {% if is_admin %}
+        <form method="POST" action="{{ url_for('dashboard.force_pyq_sync', roadmap_id=roadmap.id) }}" class="inline-form">
+            <input type="hidden" name="next" value="practice">
+            <button type="submit" class="ghost">Refresh PYQ cache now</button>
+        </form>
+        {% endif %}
+    </article>
 
     <div class="grid grid-2 compact-grid">
         <article class="card soft-card">
@@ -127,15 +169,18 @@
     <div class="question-grid">
         {% for q in questions %}
             <article class="question-card">
-                <h3>{{ q.question_text }}</h3>
-                <p class="muted">Topic: {{ q.topic }}</p>
+                <div class="question-head">
+                    <span class="pill">{{ q.paper }} · {{ q.year }}</span>
+                    <span class="muted">{{ q.difficulty|capitalize }}</span>
+                </div>
+                <p class="question-text">{{ q.question }}</p>
                 <details>
-                    <summary>Show answer outline</summary>
-                    <p class="muted">{{ q.answer_text }}</p>
+                    <summary>Show rule-based answer framework</summary>
+                    <p class="framework-text">{{ q.framework }}</p>
                 </details>
                 <form method="POST" action="{{ url_for('dashboard.attempt_question', question_id=q.id) }}" class="inline-form">
                     <label>
-                        Score (0-5)
+                        Self-score (0-5)
                         <input type="number" name="score" min="0" max="5" value="{{ attempts.get(q.id).score if attempts.get(q.id) else 3 }}">
                     </label>
                     <input type="text" name="notes" placeholder="What will you improve next time?">
@@ -145,7 +190,21 @@
                     <p class="muted">Last score: {{ attempts.get(q.id).score }} | Last note: {{ attempts.get(q.id).notes or 'No note added' }}</p>
                 {% endif %}
             </article>
+        {% else %}
+            <p class="muted">The free mains PYQ cache is still loading. Retry in a moment.</p>
         {% endfor %}
+    </div>
+
+    <div class="attribution-note">
+        <p class="muted">{{ pyq_attribution }}</p>
+        <div class="action-links">
+            <a class="primary" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">Take a PYQ test</a>
+            <a class="ghost" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id, mode='mock') }}">Full prelims mock</a>
+            <a class="ghost" href="{{ url_for('dashboard.mains_practice', roadmap_id=roadmap.id) }}">Mains practice</a>
+            <a class="ghost" href="{{ url_for('dashboard.materials', roadmap_id=roadmap.id) }}">Materials hub</a>
+            <a class="ghost" href="{{ official_pyq_url }}" target="_blank" rel="noopener">Official PYQ papers</a>
+            <a class="ghost" href="{{ official_answer_key_url }}" target="_blank" rel="noopener">Official answer keys</a>
+        </div>
     </div>
 </section>
 <script>

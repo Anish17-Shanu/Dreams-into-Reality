@@ -6,7 +6,34 @@
         <h1>Generate a timeline you can actually follow</h1>
         <p class="muted">Add your syllabus or career goal, then review the extracted topics before saving the final roadmap. This keeps the output clean, personal, and realistic.</p>
     </div>
-    <form method="POST" enctype="multipart/form-data" class="stack">
+    <form method="POST" enctype="multipart/form-data" class="stack" data-nl-parser data-parse-url="{{ url_for('dashboard.parse_nl_plan') }}">
+        <input type="hidden" name="nl_type_touched" value="0" data-nl-type-touched>
+        <div class="nl-panel">
+            <div class="nl-panel-head">
+                <div>
+                    <span class="pill">Natural language</span>
+                    <h3>Describe your plan in one sentence</h3>
+                    <p class="muted">Type it the way you would say it. We understand the goal, timeline, daily hours, study days, level, and topics, then fill the form for you. No AI service, no cost.</p>
+                </div>
+                <span class="nl-status" data-nl-status aria-live="polite"></span>
+            </div>
+            <label>
+                Your plan
+                <textarea name="nl_input" rows="3" placeholder="e.g. I want to become a data analyst in 3 months, 2 hours a day, 5 days a week. Topics: Excel, SQL, Power BI, statistics." data-nl-text></textarea>
+            </label>
+            <div class="nl-examples" aria-label="Example plans">
+                <span class="muted">Try:</span>
+                <button type="button" class="nl-example" data-nl-example="I want to become a data analyst in 3 months, 2 hours a day, 5 days a week. Topics: Excel, SQL, Power BI, statistics.">Data analyst</button>
+                <button type="button" class="nl-example" data-nl-example="BCA semester 4 exam in 30 days, 3 hours daily. Subjects: DBMS, Operating Systems, Python, Computer Networks.">BCA exam</button>
+                <button type="button" class="nl-example" data-nl-example="Frontend developer career in 8 weeks, 90 minutes a day, beginner. Topics: HTML, CSS, JavaScript, React.">Frontend developer</button>
+            </div>
+            <div class="nl-actions">
+                <button type="button" class="ghost" data-nl-parse>Understand my sentence</button>
+                <span class="muted">or press Ctrl + Enter</span>
+            </div>
+            <ul class="nl-chips" data-nl-chips hidden></ul>
+            <div class="nl-notes" data-nl-notes hidden></div>
+        </div>
         <div class="helper-panel">
             <h3>What works best here</h3>
             <div class="simple-list">
@@ -16,17 +43,17 @@
                 </div>
                 <div>
                     <strong>Career goal</strong>
-                    <p class="muted">Type a role like "Data Analyst" or "Frontend Developer" to generate a focused skill path.</p>
+                    <p class="muted">Just type the role, like "Nurse", "Civil Engineer", or "Marketing Manager". We auto-build topics, projects, assignments, a toolkit, and proof tasks.</p>
                 </div>
                 <div>
                     <strong>Before you save</strong>
-                    <p class="muted">You will get a review screen to remove noise, reorder topics, and confirm the final timeline.</p>
+                    <p class="muted">Syllabus plans get a review screen. Career plans generate instantly with a complete preparation context.</p>
                 </div>
             </div>
         </div>
         <label>
-            Plan title
-            <input type="text" name="title" placeholder="e.g. Data Analyst Plan" required>
+            Plan title or career role
+            <input type="text" name="title" placeholder="e.g. Data Analyst, Nurse, or Semester 4 Syllabus">
         </label>
         <label>
             Plan type
@@ -35,29 +62,29 @@
                 <option value="career">Career Goal</option>
             </select>
         </label>
-        <label>
-            Timeline in weeks (optional)
-            <input type="number" name="timeline_weeks" min="0" max="52" value="0">
-        </label>
-        <p class="muted">Leave this as 0 to auto-estimate based on your available study hours.</p>
         <div class="inline-fields">
             <label>
-                Study hours per week
-                <input type="number" name="hours_per_week" min="1" max="40" value="6">
+                Days available (optional)
+                <input type="number" name="plan_days" min="0" max="730" value="0">
+            </label>
+            <label>
+                Hours per study day
+                <input type="number" name="hours_per_day" min="0.5" max="16" step="0.5" value="2">
             </label>
             <label>
                 Study days per week
                 <input type="number" name="study_days_per_week" min="1" max="7" value="5">
             </label>
-            <label>
-                Plan intensity
-                <select name="pace_mode">
-                    <option value="steady">Steady and realistic</option>
-                    <option value="burnout_safe">Burnout-safe</option>
-                    <option value="sprint">Fast-track</option>
-                </select>
-            </label>
         </div>
+        <p class="muted">Enter the days you actually have. Leave days as 0 to auto-estimate from the topics and your daily hours. The plan is scheduled only on your study days.</p>
+        <label>
+            Plan intensity
+            <select name="pace_mode">
+                <option value="steady">Steady and realistic</option>
+                <option value="burnout_safe">Burnout-safe</option>
+                <option value="sprint">Fast-track</option>
+            </select>
+        </label>
         <div class="inline-fields">
             <label>
                 Current level
@@ -114,11 +141,8 @@
             Upload a syllabus file if you have one
             <input type="file" name="syllabus_file" accept=".pdf,.txt,.docx,.png,.jpg,.jpeg,.bmp,.tiff">
         </label>
-        <label class="inline-check">
-            <input type="checkbox" name="use_ai">
-            Clean messy syllabus text automatically
-        </label>
         <button type="submit">Generate Timeline &amp; Roadmap</button>
     </form>
 </section>
+<script src="{{ url_for('static', filename='plan-nl.js') }}" defer></script>
 {% endblock %}

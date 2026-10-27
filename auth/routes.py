@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, session, url_fo
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.models import User
 from extensions import db
+from security import rate_limit
 import re
 
 auth_bp = Blueprint('auth', __name__)
@@ -21,6 +22,7 @@ def _password_feedback(password):
     return None
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
+@rate_limit(5, 300, scope="auth.register")
 def register():
     if request.method == 'POST':
         email = request.form['email'].strip().lower()
@@ -50,6 +52,7 @@ def register():
     return render_template('register.html')
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@rate_limit(10, 300, scope="auth.login")
 def login():
     if request.method == 'POST':
         email = request.form['email'].strip().lower()
@@ -65,7 +68,7 @@ def login():
         flash('Invalid credentials.')
     return render_template('login.html')
 
-@auth_bp.route('/logout')
+@auth_bp.route('/logout', methods=['POST'])
 def logout():
     session.pop('user_id', None)
     return redirect(url_for('auth.login'))

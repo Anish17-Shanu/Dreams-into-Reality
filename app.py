@@ -1,14 +1,28 @@
 """Dreams into Reality application created by Anish Kumar."""
 
-from flask import Flask, flash, redirect, request, url_for
+from flask import Flask, flash, redirect, request, url_for, jsonify
 from config import Config
 from extensions import db
 from auth.routes import auth_bp
 from dashboard.routes import dashboard_bp
 from flask_migrate import Migrate
 import os
+import sqlite3
 from werkzeug.exceptions import RequestEntityTooLarge
-from sqlalchemy import inspect, text
+from sqlalchemy import event, inspect, text
+from sqlalchemy.engine import Engine
+from security import install_security
+
+
+@event.listens_for(Engine, "connect")
+def _sqlite_pragmas(dbapi_connection, connection_record):
+    if not isinstance(dbapi_connection, sqlite3.Connection):
+        return
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=30000")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
 
 
 def _default_sql_literal(value):
@@ -60,19 +74,25 @@ app = Flask(__name__)
 app.config.from_object(Config)
 migrate = Migrate(app, db)
 db.init_app(app)
+install_security(app)
+
+if app.config.get("IS_PRODUCTION") and app.config["SECRET_KEY"] in {"", "track_secret"}:
+    raise RuntimeError("Set a strong SECRET_KEY before running in production.")
 
 # Register blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
 
 
-@app.after_request
-def add_security_headers(response):
-    response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("X-Frame-Options", "DENY")
-    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    return response
+@app.get("/healthz")
+def healthz():
+    try:
+        db.session.execute(text("SELECT 1"))
+        db.session.remove()
+        return jsonify({"status": "ok", "database": "up"}), 200
+    except Exception as exc:  # pragma: no cover - only hit when the DB is down
+        app.logger.error("Health check failed: %s", exc)
+        return jsonify({"status": "degraded", "database": "down"}), 503
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -87,6 +107,13 @@ with app.app_context():
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     if app.config.get("AUTO_CREATE_SCHEMA"):
         ensure_schema()
+    if app.config.get("PYQ_SEED_ENABLED"):
+        try:
+            from pyq.seed import seed_bank
+
+            seed_bank()
+        except Exception as exc:  # pragma: no cover - startup must not fail
+            app.logger.warning("Could not load the bundled PYQ seed: %s", exc)
 
 if __name__ == "__main__":
     import os

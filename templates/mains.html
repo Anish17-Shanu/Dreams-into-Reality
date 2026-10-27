@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header panel-header-start">
+        <div>
+            <span class="pill">Mains</span>
+            <h1>Mains PYQ Practice</h1>
+            <p class="muted">Real UPSC mains questions with a rule-based answer framework. No model answers are invented; verify facts from official sources.</p>
+        </div>
+        <div class="test-meta">
+            <strong>{{ coverage.mains_total }}</strong>
+            <span class="muted">mains PYQs cached</span>
+        </div>
+    </div>
+
+    <div class="grid grid-2 compact-grid">
+        <article class="card soft-card">
+            <h3>Filter by paper</h3>
+            <div class="action-links">
+                <a class="ghost {% if not selected_paper %}active-link{% endif %}" href="{{ url_for('dashboard.mains_practice', roadmap_id=roadmap.id) }}">All papers</a>
+                {% for paper in available_papers %}
+                <a class="ghost {% if selected_paper == paper %}active-link{% endif %}" href="{{ url_for('dashboard.mains_practice', roadmap_id=roadmap.id, paper=paper) }}">{{ paper }}</a>
+                {% endfor %}
+            </div>
+            <p class="muted">Questions are randomized from the free cache. Self-score honestly; the goal is structure, not volume.</p>
+        </article>
+        <article class="card soft-card">
+            <h3>How to use this page</h3>
+            <div class="simple-list">
+                <div><strong>1. Read the directive</strong><p class="muted">Evaluate, examine, discuss, and comment need different structures.</p></div>
+                <div><strong>2. Write within the limit</strong><p class="muted">Finish in the time you would get in the exam, then self-score.</p></div>
+                <div><strong>3. Review the framework</strong><p class="muted">Compare your structure against the framework after writing, not before.</p></div>
+            </div>
+        </article>
+    </div>
+
+    <div class="question-grid">
+        {% for q in questions %}
+        <article class="question-card">
+            <div class="question-head">
+                <span class="pill">{{ q.paper }} · {{ q.year }}</span>
+                <span class="muted">{{ q.difficulty|capitalize }}</span>
+            </div>
+            <p class="question-text">{{ q.question }}</p>
+            <details>
+                <summary>Show answer framework</summary>
+                <p class="framework-text">{{ q.framework }}</p>
+            </details>
+            <form method="POST" action="{{ url_for('dashboard.attempt_question', question_id=q.id) }}" class="inline-form">
+                <label>
+                    Self-score (0-5)
+                    <input type="number" name="score" min="0" max="5" value="{{ attempts.get(q.id).score if attempts.get(q.id) else 3 }}">
+                </label>
+                <input type="text" name="notes" placeholder="One structural improvement for next time">
+                <button type="submit">Save answer practice</button>
+            </form>
+            {% if attempts.get(q.id) %}
+            <p class="muted">Last score: {{ attempts.get(q.id).score }} | Last note: {{ attempts.get(q.id).notes or 'No note added' }}</p>
+            {% endif %}
+        </article>
+        {% else %}
+        <p class="muted">The mains cache is still loading. Retry in a moment.</p>
+        {% endfor %}
+    </div>
+
+    <div class="attribution-note">
+        <p class="muted">{{ pyq_attribution }}</p>
+        <div class="action-links">
+            <a class="primary" href="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}">Prelims PYQ test</a>
+            <a class="ghost" href="{{ url_for('dashboard.practice', roadmap_id=roadmap.id) }}">Practice Vault</a>
+            <a class="ghost" href="{{ url_for('dashboard.materials', roadmap_id=roadmap.id) }}">Materials hub</a>
+            <a class="ghost" href="{{ official_pyq_url }}" target="_blank" rel="noopener">Official question papers</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

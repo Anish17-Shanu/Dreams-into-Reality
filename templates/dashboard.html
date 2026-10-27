@@ -12,6 +12,59 @@
     </div>
 </section>
 
+{% if momentum %}
+<section class="momentum-panel momentum-{{ momentum.tone }}">
+    <div class="momentum-top">
+        <div>
+            <p class="eyebrow">Your current title</p>
+            <h2>{{ momentum.title }}</h2>
+            <p class="momentum-message">{{ momentum.message }}</p>
+        </div>
+        <div class="momentum-score">
+            <strong>{{ momentum.score }}</strong>
+            <span>momentum score</span>
+            <div class="progress">
+                <div class="progress-bar" style="width: {{ momentum.score }}%"></div>
+            </div>
+        </div>
+    </div>
+    <div class="momentum-stats">
+        <span><strong>{{ momentum.done }}</strong> tasks completed</span>
+        <span><strong>{{ momentum.total - momentum.done }}</strong> to go</span>
+        <span><strong>{{ momentum.overdue }}</strong> overdue</span>
+        <span><strong>{{ momentum.streak }}</strong> day streak</span>
+    </div>
+    {% if momentum.badges %}
+    <div class="badge-row">
+        {% for badge in momentum.badges %}
+        <span class="badge badge-{{ badge.tone }}" title="{{ badge.detail }}">{{ badge.name }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if momentum.next_badge %}
+    <div class="next-badge">
+        <div class="next-badge-text">
+            <strong>Next badge: {{ momentum.next_badge.name }}</strong>
+            <p class="muted">{{ momentum.next_badge.detail }}</p>
+        </div>
+        <div class="next-badge-progress">
+            <div class="progress">
+                <div class="progress-bar" style="width: {{ momentum.next_badge.progress }}%"></div>
+            </div>
+            <span>{{ momentum.next_badge.value }}/{{ momentum.next_badge.target }}</span>
+        </div>
+    </div>
+    {% endif %}
+    <div class="action-links">
+        {% if active_roadmap %}
+        <a class="primary-link" href="{{ url_for('dashboard.view_roadmap', roadmap_id=active_roadmap.id) }}{% if active_next %}#task-{{ active_next.id }}{% endif %}">Continue the next step</a>
+        {% else %}
+        <a class="primary-link" href="{{ url_for('dashboard.create_roadmap') }}">Create your first plan</a>
+        {% endif %}
+    </div>
+</section>
+{% endif %}
+
 <section class="grid grid-3 compact-grid">
     <article class="card summary-card">
         <p class="eyebrow">Account</p>

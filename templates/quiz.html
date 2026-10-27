@@ -4,85 +4,154 @@
     <div class="panel-header panel-header-start">
         <div>
             <span class="pill">Test</span>
-            <h1>UPSC Quick Quiz</h1>
-            <p class="muted">Use this as a diagnostic, sectional accuracy check, or revision test. Negative marking is applied: +2 correct, -0.66 incorrect.</p>
+            <h1>{% if is_retest %}Weak-topic Retest{% elif mode == 'open' %}Open Archive Practice{% elif mode == 'mock' %}UPSC Prelims Full Mock{% elif mode == 'weekly' %}Weekly PYQ Assessment{% elif roadmap.roadmap_type == 'upsc' %}UPSC PYQ Test{% else %}Roadmap Check{% endif %}</h1>
+            <p class="muted">
+                {% if mode == 'open' %}
+                Archive-year UPSC questions whose answer keys are not officially verified. Practice only: no negative marking, and always cross-check the official key before trusting a score.
+                {% elif roadmap.roadmap_type == 'upsc' %}
+                Real UPSC previous-year questions from verified years. UPSC marking: +2 correct, -0.66 incorrect, 0 for unattempted.
+                {% else %}
+                These questions check whether your plan's study actions are clear. There is no negative marking for non-UPSC roadmaps.
+                {% endif %}
+            </p>
         </div>
+        {% if roadmap.roadmap_type == 'upsc' %}
+        <div class="test-meta">
+            <strong id="quiz-timer" data-minutes="{{ duration_minutes }}">{{ duration_minutes }}:00</strong>
+            <span class="muted">{{ questions|length }} questions · {{ duration_minutes }} min</span>
+        </div>
+        {% endif %}
     </div>
 
     <div class="grid grid-2 compact-grid">
         <article class="card soft-card">
-            <h3>Customize this test</h3>
+            <h3>Change test mode</h3>
             <form method="GET" action="{{ url_for('dashboard.quiz', roadmap_id=roadmap.id) }}" class="inline-form">
                 <select name="mode">
-                    <option value="standard" {% if mode == 'standard' %}selected{% endif %}>Standard quiz</option>
-                    <option value="weekly" {% if mode == 'weekly' %}selected{% endif %}>Weekly assessment</option>
+                    <option value="standard" {% if mode == 'standard' %}selected{% endif %}>Subject-aware PYQ practice</option>
+                    <option value="weekly" {% if mode == 'weekly' %}selected{% endif %}>Weekly PYQ assessment</option>
+                    <option value="pyq" {% if mode == 'pyq' %}selected{% endif %}>Random PYQs (all years)</option>
+                    {% if roadmap.roadmap_type == 'upsc' %}
+                    <option value="mock" {% if mode == 'mock' %}selected{% endif %}>Full prelims mock (100 Q)</option>
+                    <option value="open" {% if mode == 'open' %}selected{% endif %}>Open archive practice (unverified keys)</option>
+                    {% endif %}
                 </select>
+                {% if roadmap.roadmap_type != 'upsc' %}
                 <select name="difficulty">
                     <option value="easy" {% if selected_difficulty == 'easy' %}selected{% endif %}>Easy</option>
                     <option value="medium" {% if selected_difficulty == 'medium' %}selected{% endif %}>Medium</option>
                     <option value="hard" {% if selected_difficulty == 'hard' %}selected{% endif %}>Hard</option>
                 </select>
+                {% endif %}
+                {% if mode != 'mock' %}
                 <select name="amount">
                     <option value="5" {% if selected_amount == 5 %}selected{% endif %}>5 questions</option>
                     <option value="10" {% if selected_amount == 10 %}selected{% endif %}>10 questions</option>
                     <option value="15" {% if selected_amount == 15 %}selected{% endif %}>15 questions</option>
                     <option value="20" {% if selected_amount == 20 %}selected{% endif %}>20 questions</option>
+                    {% if roadmap.roadmap_type == 'upsc' %}
+                    <option value="30" {% if selected_amount == 30 %}selected{% endif %}>30 questions</option>
+                    <option value="50" {% if selected_amount == 50 %}selected{% endif %}>50 questions</option>
+                    {% endif %}
                 </select>
-                <button type="submit">Build quiz</button>
+                {% endif %}
+                <button type="submit">Build test</button>
             </form>
+            <p class="muted">Every test is freshly randomized. The same PYQ will not be reused inside one paper.</p>
         </article>
         <article class="card soft-card">
-            <h3>{% if mode == 'weekly' %}Weekly assessment focus{% else %}Recent quiz trend{% endif %}</h3>
-            {% if mode == 'weekly' %}
-            <div class="simple-list">
-                {% for item in focus_topics %}
-                <div>
-                    <strong>{{ item }}</strong>
-                    <p class="muted">Included from this roadmap's near-term study context.</p>
-                </div>
-                {% else %}
-                <div><p class="muted">No urgent weekly topics were found, so the quiz fell back to broader roadmap coverage.</p></div>
+            <h3>{% if is_retest %}Weak areas in this retest{% elif mode == 'weekly' %}This week's subject focus{% else %}Test context{% endif %}</h3>
+            {% if focus_topics %}
+            <div class="chip-row">
+                {% for item in focus_topics[:8] %}
+                <span class="chip">{{ item }}</span>
                 {% endfor %}
             </div>
-            {% elif recent_results %}
-            <div class="simple-list">
-                {% for item in recent_results %}
-                <div>
-                    <strong>Score {{ item.score }}</strong>
-                    <p class="muted">{{ item.correct }}/{{ item.total_questions }} correct on {{ item.attempted_at.strftime("%Y-%m-%d") }}</p>
-                </div>
-                {% endfor %}
-            </div>
+            {% elif mode == 'open' %}
+            <p class="muted">This test draws from archive years with unverified keys. Treat it as practice, not a benchmark.</p>
             {% else %}
-            <p class="muted">No quiz history yet. Your first attempt will set the baseline.</p>
+            <p class="muted">This test covers the full verified PYQ pool.</p>
+            {% endif %}
+            {% if pyq_stats %}
+            <p class="muted">Free PYQ cache: {{ pyq_stats.prelims_total }} prelims MCQs from {{ pyq_stats.years|join(', ') }}. No LLM or paid API is used.</p>
+            {% endif %}
+            {% if recent_results %}
+            <p class="muted">Last result: {{ recent_results[0].correct }}/{{ recent_results[0].total_questions }} correct on {{ recent_results[0].attempted_at.strftime("%Y-%m-%d") }}.</p>
+            {% else %}
+            <p class="muted">This attempt will set your baseline.</p>
             {% endif %}
         </article>
     </div>
 
-    <form method="POST" action="{{ url_for('dashboard.quiz_submit', roadmap_id=roadmap.id) }}" class="stack">
-        <input type="hidden" name="total" value="{{ questions|length }}">
+    <form method="POST" action="{{ url_for('dashboard.quiz_submit', roadmap_id=roadmap.id) }}" class="stack" id="quiz-form">
+        <input type="hidden" name="mode" value="{{ mode }}">
         {% for q in questions %}
-            <article class="question-card">
-                <h3>{{ loop.index }}. {{ q.question | safe }}</h3>
-                {% if q.id %}
-                <input type="hidden" name="qid_{{ loop.index0 }}" value="{{ q.id }}">
-                {% else %}
-                <input type="hidden" name="a_{{ loop.index0 }}" value="{{ q.answer }}">
-                {% endif %}
-                {% if q.category or q.source %}
-                <p class="muted">Topic: {{ q.category or 'General' }}{% if q.source %} | Source: {{ q.source }}{% endif %}</p>
-                {% endif %}
+            {% set qidx = loop.index0 %}
+            <article class="question-card" id="question-{{ qidx }}">
+                <div class="question-head">
+                    <span class="pill">{{ q.category or 'General' }}{% if q.year %} · {{ q.year }}{% endif %}</span>
+                    <span class="muted">Question {{ loop.index }} of {{ questions|length }}</span>
+                </div>
+                <p class="question-text">{{ q.question }}</p>
+                <input type="hidden" name="qid_{{ qidx }}" value="{{ q.id }}">
                 <div class="option-grid">
                     {% for opt in q.options %}
                         <label class="option-pill">
-                            <input type="radio" name="q_{{ loop.index0 }}" value="{{ opt }}">
-                            {{ opt | safe }}
+                            <input type="radio" name="q_{{ qidx }}" value="{{ 'abcd'[loop.index0] }}">
+                            <span><strong>{{ 'ABCD'[loop.index0] }}.</strong> {{ opt }}</span>
                         </label>
                     {% endfor %}
                 </div>
+                {% if q.source %}
+                <p class="muted small">Source: {% if q.source_url %}<a href="{{ q.source_url }}" target="_blank" rel="noopener">{{ q.source }}</a>{% else %}{{ q.source }}{% endif %}</p>
+                {% endif %}
             </article>
         {% endfor %}
-        <button type="submit">Submit quiz</button>
+
+        <div class="quiz-submit-bar">
+            <p class="muted">Unattempted questions score 0. Review every answer after submitting.</p>
+            <button type="submit">Submit test</button>
+        </div>
     </form>
+
+    {% if roadmap.roadmap_type == 'upsc' %}
+    <div class="attribution-note">
+        <p class="muted">{{ pyq_attribution }}</p>
+        <div class="action-links">
+            <a class="ghost" href="{{ official_pyq_url }}" target="_blank" rel="noopener">Official UPSC question papers</a>
+            <a class="ghost" href="{{ official_answer_key_url }}" target="_blank" rel="noopener">Official UPSC answer keys</a>
+        </div>
+    </div>
+    {% endif %}
 </section>
+<script>
+    (function () {
+        const timer = document.getElementById("quiz-timer");
+        const form = document.getElementById("quiz-form");
+        if (!timer || !form) return;
+        let remaining = parseInt(timer.dataset.minutes, 10) * 60;
+        let submitted = false;
+        function render() {
+            const minutes = Math.floor(remaining / 60);
+            const seconds = remaining % 60;
+            timer.textContent = `${minutes}:${String(seconds).padStart(2, "0")}`;
+            timer.classList.toggle("timer-low", remaining <= 300);
+        }
+        render();
+        const interval = setInterval(() => {
+            remaining -= 1;
+            if (remaining <= 0) {
+                clearInterval(interval);
+                timer.textContent = "0:00";
+                if (!submitted) {
+                    submitted = true;
+                    form.requestSubmit();
+                }
+                return;
+            }
+            render();
+        }, 1000);
+        form.addEventListener("submit", () => { submitted = true; });
+    })();
+</script>
 {% endblock %}

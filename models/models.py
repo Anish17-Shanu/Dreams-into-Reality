@@ -19,6 +19,8 @@ class Roadmap(db.Model):
     completed_tasks = db.Column(db.Integer, default=0)
     total_hours_est = db.Column(db.Float, default=0.0)
     hours_per_week = db.Column(db.Integer, default=6)
+    hours_per_day = db.Column(db.Float, default=2.0)
+    plan_days = db.Column(db.Integer, nullable=True)
     study_days_per_week = db.Column(db.Integer, default=5)
     timezone = db.Column(db.String(60), default="Asia/Kolkata")
     streak = db.Column(db.Integer, default=0)
@@ -63,6 +65,8 @@ class Resource(db.Model):
     rating_avg = db.Column(db.Float, default=0.0)
     rating_count = db.Column(db.Integer, default=0)
     flagged_count = db.Column(db.Integer, default=0)
+    last_checked_at = db.Column(db.DateTime, nullable=True)
+    is_alive = db.Column(db.Boolean, default=True)
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
     feedback = db.relationship('ResourceFeedback', backref='resource', lazy=True, cascade="all, delete-orphan", passive_deletes=True)
 
@@ -94,6 +98,19 @@ class Question(db.Model):
     answer_text = db.Column(db.Text, nullable=True)
     difficulty = db.Column(db.String(20), default="medium")
     is_public = db.Column(db.Boolean, default=True)
+    # PYQ fields. NULL means a non-PYQ/manual question.
+    stage = db.Column(db.String(20), nullable=True)  # prelims | mains
+    year = db.Column(db.Integer, nullable=True)
+    paper = db.Column(db.String(80), nullable=True)
+    options_json = db.Column(db.Text, nullable=True)
+    correct_answer = db.Column(db.Text, nullable=True)
+    source_url = db.Column(db.String(600), nullable=True)
+    source_name = db.Column(db.String(160), nullable=True)
+    external_id = db.Column(db.String(120), nullable=True, index=True)
+    quality_score = db.Column(db.Float, default=0.0)
+    # verified = official key cross-checked, imported = official paper PDF,
+    # archive = public archive without official key verification.
+    verification = db.Column(db.String(20), default="archive")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -135,6 +152,7 @@ class QuizResult(db.Model):
     correct = db.Column(db.Integer, default=0)
     incorrect = db.Column(db.Integer, default=0)
     score = db.Column(db.Float, default=0.0)
+    mode = db.Column(db.String(20), default="standard")
     attempted_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     roadmap_id = db.Column(db.Integer, db.ForeignKey('roadmap.id'), nullable=False)
@@ -147,6 +165,7 @@ class QuizQuestion(db.Model):
     correct_answer = db.Column(db.Text, nullable=False)
     category = db.Column(db.String(180), nullable=True)
     source = db.Column(db.String(80), nullable=True)
+    source_url = db.Column(db.String(600), nullable=True)
     difficulty = db.Column(db.String(20), default="medium")
     mode = db.Column(db.String(20), default="standard")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -161,3 +180,16 @@ class QuizQuestionAttempt(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     quiz_result_id = db.Column(db.Integer, db.ForeignKey('quiz_result.id'), nullable=False)
     question_id = db.Column(db.Integer, db.ForeignKey('quiz_question.id'), nullable=False)
+
+
+class PyqSyncState(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    source = db.Column(db.String(160), unique=True, nullable=False)
+    status = db.Column(db.String(20), default="idle")  # idle | running | done | failed
+    item_count = db.Column(db.Integer, default=0)
+    detail = db.Column(db.String(300), nullable=True)
+    etag = db.Column(db.String(300), nullable=True)
+    last_modified = db.Column(db.String(120), nullable=True)
+    content_hash = db.Column(db.String(64), nullable=True)
+    last_synced_at = db.Column(db.DateTime, nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
